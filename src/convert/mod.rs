@@ -123,4 +123,93 @@ impl Converter {
             foreign_members: None,
         }
     }
+
+    pub fn to_umap_geojson(places: &[GooglePlace]) -> FeatureCollection {
+        let features: Vec<Feature> = places
+            .iter()
+            .filter_map(|place| {
+                let lat = place.latitude.as_ref().and_then(|s| s.parse::<f64>().ok());
+                let lon = place.longitude.as_ref().and_then(|s| s.parse::<f64>().ok());
+
+                if lat.is_none() && lon.is_none() {
+                    return None;
+                }
+
+                let geometry = if let (Some(latitude), Some(longitude)) = (lat, lon) {
+                    Geometry::new(Value::Point(vec![longitude, latitude]))
+                } else {
+                    return None;
+                };
+
+                let mut properties = Map::new();
+
+                let name = place.title.as_deref().or(place.place_name.as_deref()).unwrap_or("");
+                properties.insert("name".to_string(), serde_json::Value::String(name.to_string()));
+
+                let mut desc_lines = Vec::new();
+
+                if let Some(t) = &place.title {
+                    desc_lines.push(format!("名稱: {}", t));
+                }
+
+                if let Some(eng) = &place.english_name {
+                    if !eng.is_empty() {
+                        desc_lines.push(format!("English: {}", eng));
+                    }
+                }
+
+                if let Some(url) = &place.url {
+                    if !url.is_empty() {
+                        desc_lines.push(format!("Google Maps: {}", url));
+                    }
+                }
+
+                if let Some(rating) = &place.rating {
+                    if !rating.is_empty() {
+                        desc_lines.push(format!("Rating: {}", rating));
+                    }
+                }
+
+                if let Some(note) = &place.notes {
+                    if !note.is_empty() {
+                        desc_lines.push(format!("Note: {}", note));
+                    }
+                }
+
+                if let Some(tags) = &place.tags {
+                    if !tags.is_empty() {
+                        desc_lines.push(format!("Tags: {}", tags));
+                    }
+                }
+
+                if let Some(website) = &place.website {
+                    if !website.is_empty() {
+                        desc_lines.push(format!("Website: {}", website));
+                    }
+                }
+
+                if let Some(desc) = &place.description {
+                    if !desc.is_empty() {
+                        desc_lines.push(format!("簡介: {}", desc));
+                    }
+                }
+
+                properties.insert("description".to_string(), serde_json::Value::String(desc_lines.join("\n")));
+
+                Some(Feature {
+                    bbox: None,
+                    geometry: Some(geometry),
+                    id: None,
+                    properties: Some(properties),
+                    foreign_members: None,
+                })
+            })
+            .collect();
+
+        FeatureCollection {
+            bbox: None,
+            features,
+            foreign_members: None,
+        }
+    }
 }
