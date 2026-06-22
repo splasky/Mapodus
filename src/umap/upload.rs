@@ -53,28 +53,16 @@ impl UmapClient {
     }
 
     fn compute_center(fc: &geojson::FeatureCollection) -> Option<(f64, f64)> {
-        let mut sum_lon = 0.0f64;
-        let mut sum_lat = 0.0f64;
-        let mut count = 0u32;
         for feature in &fc.features {
             if let Some(geometry) = &feature.geometry {
-                match &geometry.value {
-                    geojson::Value::Point(coords) => {
-                        if coords.len() >= 2 {
-                            sum_lon += coords[0];
-                            sum_lat += coords[1];
-                            count += 1;
-                        }
+                if let geojson::Value::Point(coords) = &geometry.value {
+                    if coords.len() >= 2 {
+                        return Some((coords[0], coords[1]));
                     }
-                    _ => {}
                 }
             }
         }
-        if count > 0 {
-            Some((sum_lon / count as f64, sum_lat / count as f64))
-        } else {
-            None
-        }
+        None
     }
 
     pub async fn create_map(
@@ -191,13 +179,13 @@ impl UmapClient {
         geojson: &geojson::FeatureCollection,
         auth: &CookieAuth,
     ) -> Result<String> {
-        let json_string = serde_json::to_string(geojson)?;
-        let uuid = Self::generate_uuid();
+        let layer_id = Self::generate_uuid();
         let url = format!(
             "{}/map/{}/datalayer/create/{}/",
-            self.base_url, map_id, uuid
+            self.base_url, map_id, layer_id
         );
 
+        let json_string = serde_json::to_string(geojson)?;
         let part = reqwest::multipart::Part::bytes(json_string.into_bytes())
             .file_name("data.geojson")
             .mime_str("application/json")?;
@@ -229,14 +217,15 @@ impl UmapClient {
         let response_text = response.text().await?;
         let layer_data: serde_json::Value = serde_json::from_str(&response_text)?;
 
-        if let Some(id) = layer_data.get("id").and_then(|v| v.as_str()) {
-            Ok(id.to_string())
-        } else {
-            Err(anyhow::anyhow!(
+        let _id_check = layer_id_to_string(layer_data.get("id"))
+            .ok_or_else(|| anyhow::anyhow!(
                 "Failed to create layer, response: {}",
                 response_text
-            ))
-        }
+            ))?;
+
+        self.upload_geojson(map_id, &layer_id, layer_name, geojson, auth).await?;
+
+        Ok(layer_id)
     }
 
     pub async fn upload_geojson(
@@ -260,7 +249,8 @@ impl UmapClient {
         let form = reqwest::multipart::Form::new()
             .part("geojson", part)
             .text("name", layer_name.to_string())
-            .text("display_on_load", "true");
+            .text("display_on_load", "true")
+            .text("rank", "1");
 
         let response = self
             .client
