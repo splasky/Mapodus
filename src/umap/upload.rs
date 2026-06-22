@@ -34,7 +34,10 @@ impl UmapClient {
     pub fn new(base_url: &str) -> Self {
         UmapClient {
             base_url: base_url.trim_end_matches('/').to_string(),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .expect("Failed to build reqwest client"),
         }
     }
 
