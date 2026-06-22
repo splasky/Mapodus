@@ -12,3 +12,4 @@ geojson = { version = "0.24", features = ["geo-types"] }
 reqwest = { version = "0.12", features = ["json", "multipart"] }
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
+uuid = { version = "1.23.3", features = ["v4"] }
