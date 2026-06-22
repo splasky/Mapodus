@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fmt;
+
 use anyhow::{anyhow, Result};
 
 #[derive(Debug, Clone)]
@@ -52,5 +54,15 @@ impl CookieAuth {
 
     pub fn to_csrf_header(&self) -> String {
         self.csrf_token.clone()
+    }
+}
+
+impl fmt::Display for CookieAuth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "CookieAuth {{ sessionid: {}, csrftoken: {} }}",
+            self.session_id, self.csrf_token
+        )
     }
 }
