@@ -28,7 +28,12 @@ async fn main() -> Result<()> {
 
     let feature_collection = if let Some(takeout_path) = &args.takeout {
         let places = google::parse_takeout(takeout_path)?;
-        convert::Converter::to_geojson(&places)
+
+        if args.umap_map_id.is_some() || args.create_map.is_some() {
+            convert::Converter::to_umap_geojson(&places)
+        } else {
+            convert::Converter::to_geojson(&places)
+        }
     } else if let Some(geojson_path) = &args.geojson {
         let content = std::fs::read_to_string(geojson_path)?;
         serde_json::from_str(&content)?
@@ -42,22 +47,57 @@ async fn main() -> Result<()> {
         println!("Saved GeoJSON to {}", output_path);
     }
 
-    if let Some(map_id) = &args.umap_map_id {
-        let cookie_str = args.umap_cookie.as_ref().expect("umap-cookie required for upload");
-        let auth = umap::CookieAuth::from_cookie_str(cookie_str)?;
+    let cookie_str = args.umap_cookie.as_ref();
+    let auth = cookie_str.map(|s| umap::CookieAuth::from_cookie_str(s).unwrap());
+
+    let map_id: String;
+
+    if let Some(new_map_name) = &args.create_map {
+        let auth = auth
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("umap-cookie required for --create-map"))?;
+        let client = umap::UmapClient::new(&args.umap_url);
+        map_id = client.create_map(new_map_name, &feature_collection, auth).await?;
+    } else if let Some(existing_id) = &args.umap_map_id {
+        map_id = existing_id.clone();
+    } else {
+        return Ok(());
+    }
+
+    if let Some(auth) = &auth {
         let client = umap::UmapClient::new(&args.umap_url);
 
-        println!("Finding or creating layer '{}' on map {}", args.layer_name, map_id);
-        let layer_id = client
-            .find_or_create_layer(map_id, &args.layer_name, &auth)
-            .await?;
-        println!("Layer ID: {}", layer_id);
+        let layer_id = match client
+            .find_or_create_layer(&map_id, &args.layer_name, auth)
+            .await
+        {
+            Ok(id) => {
+                client
+                    .upload_geojson(&map_id, &id, &args.layer_name, &feature_collection, auth)
+                    .await?;
+                id
+            }
+            Err(_) => {
+                println!(
+                    "Creating new layer '{}' on map {}",
+                    args.layer_name, map_id
+                );
+                let layer_id = client
+                    .create_and_upload_layer(
+                        &map_id,
+                        &args.layer_name,
+                        &feature_collection,
+                        auth,
+                    )
+                    .await?;
+                layer_id
+            }
+        };
 
-        println!("Uploading GeoJSON...");
-        client
-            .upload_geojson(map_id, &layer_id, &args.layer_name, &feature_collection, &auth)
-            .await?;
-        println!("Successfully uploaded to uMap map {} layer {}", map_id, layer_id);
+        println!(
+            "Successfully uploaded to uMap map {} layer {}",
+            map_id, layer_id
+        );
     }
 
     Ok(())

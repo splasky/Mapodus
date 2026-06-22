@@ -33,6 +33,9 @@ pub struct CliArgs {
     #[arg(long, help = "uMap map ID to upload to")]
     pub umap_map_id: Option<String>,
 
+    #[arg(long, help = "Create a new map with this name before uploading")]
+    pub create_map: Option<String>,
+
     #[arg(long, help = "uMap session cookie (format: sessionid=xxx; csrftoken=xxx)")]
     pub umap_cookie: Option<String>,
 
@@ -53,6 +56,14 @@ impl CliArgs {
             return Err(anyhow::anyhow!("Only one of --takeout or --geojson can be provided"));
         }
         
+        if self.create_map.is_some() && self.umap_cookie.is_none() {
+            return Err(anyhow::anyhow!("--umap-cookie must be provided when --create-map is specified"));
+        }
+
+        if self.create_map.is_some() && self.umap_map_id.is_some() {
+            return Err(anyhow::anyhow!("--create-map and --umap-map-id are mutually exclusive"));
+        }
+
         if self.umap_map_id.is_some() && self.umap_cookie.is_none() {
             return Err(anyhow::anyhow!("--umap-cookie must be provided when --umap-map-id is specified"));
         }
