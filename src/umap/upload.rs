@@ -52,14 +52,91 @@ impl UmapClient {
         headers
     }
 
-    pub async fn find_or_create_layer(
+    fn compute_center(fc: &geojson::FeatureCollection) -> Option<(f64, f64)> {
+        let mut sum_lon = 0.0f64;
+        let mut sum_lat = 0.0f64;
+        let mut count = 0u32;
+        for feature in &fc.features {
+            if let Some(geometry) = &feature.geometry {
+                match &geometry.value {
+                    geojson::Value::Point(coords) => {
+                        if coords.len() >= 2 {
+                            sum_lon += coords[0];
+                            sum_lat += coords[1];
+                            count += 1;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if count > 0 {
+            Some((sum_lon / count as f64, sum_lat / count as f64))
+        } else {
+            None
+        }
+    }
+
+    pub async fn create_map(
+        &self,
+        name: &str,
+        fc: &geojson::FeatureCollection,
+        auth: &CookieAuth,
+    ) -> Result<String> {
+        let create_url = format!("{}/map/create/", self.base_url);
+
+        let center = Self::compute_center(fc)
+            .map(|(lon, lat)| {
+                serde_json::json!({"type": "Point", "coordinates": [lon, lat]}).to_string()
+            })
+            .unwrap_or_else(|| {
+                serde_json::json!({"type": "Point", "coordinates": [0.0, 0.0]}).to_string()
+            });
+
+        let params = [("name", name.to_string()), ("center", center)];
+        let response = self
+            .client
+            .post(&create_url)
+            .headers(self.build_headers(auth))
+            .form(&params)
+            .send()
+            .await?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!(
+                "Failed to create map ({}): {}",
+                status,
+                body
+            ));
+        }
+
+        let json_text = response.text().await?;
+        let map_data: serde_json::Value = serde_json::from_str(&json_text)?;
+
+        let map_id = map_data
+            .get("id")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| anyhow::anyhow!("No map id in create response: {}", json_text))?;
+
+        println!("Created map '{}' with ID: {}", name, map_id);
+        Ok(map_id.to_string())
+    }
+
+    async fn find_existing_layer(
         &self,
         map_id: &str,
         layer_name: &str,
         auth: &CookieAuth,
-    ) -> Result<String> {
+    ) -> Result<Option<String>> {
         let url = format!("{}/map/{}/geojson/", self.base_url, map_id);
-        let response = self.client.get(&url).send().await?;
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.build_headers(auth))
+            .send()
+            .await?;
         let json_text = response.text().await?;
         let geojson_data: serde_json::Value = serde_json::from_str(&json_text)?;
 
@@ -72,33 +149,88 @@ impl UmapClient {
                     if let Some(name) = layer.get("name").and_then(|n| n.as_str()) {
                         if name == layer_name {
                             if let Some(id) = layer_id_to_string(layer.get("id")) {
-                                return Ok(id);
+                                return Ok(Some(id));
                             }
                         }
                     }
                 }
             }
         }
+        Ok(None)
+    }
 
-        // Layer not found, create new one
-        let create_url = format!("{}/map/{}/datalayer/create/", self.base_url, map_id);
+    fn generate_uuid() -> String {
+        uuid::Uuid::new_v4().to_string()
+    }
+
+    pub async fn find_or_create_layer(
+        &self,
+        map_id: &str,
+        layer_name: &str,
+        auth: &CookieAuth,
+    ) -> Result<String> {
+        // Try to find existing layer
+        if let Some(id) = self
+            .find_existing_layer(map_id, layer_name, auth)
+            .await?
+        {
+            println!("Found existing layer '{}' with ID: {}", layer_name, id);
+            return Ok(id);
+        }
+
+        Err(anyhow::anyhow!(
+            "No existing layer '{}' found on map {}. Use --layer-name with a layer that already exists, or skip this flag to use the default.",
+            layer_name, map_id
+        ))
+    }
+
+    pub async fn create_and_upload_layer(
+        &self,
+        map_id: &str,
+        layer_name: &str,
+        geojson: &geojson::FeatureCollection,
+        auth: &CookieAuth,
+    ) -> Result<String> {
+        let json_string = serde_json::to_string(geojson)?;
+        let uuid = Self::generate_uuid();
+        let url = format!(
+            "{}/map/{}/datalayer/create/{}/",
+            self.base_url, map_id, uuid
+        );
+
+        let part = reqwest::multipart::Part::bytes(json_string.into_bytes())
+            .file_name("data.geojson")
+            .mime_str("application/json")?;
+
         let form = reqwest::multipart::Form::new()
+            .part("geojson", part)
             .text("name", layer_name.to_string())
-            .text("display_on_load", "true".to_string());
+            .text("display_on_load", "true")
+            .text("rank", "1");
 
         let response = self
             .client
-            .post(&create_url)
+            .post(&url)
             .headers(self.build_headers(auth))
             .multipart(form)
             .send()
             .await?;
 
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!(
+                "Failed to create layer ({}): {}",
+                status,
+                body
+            ));
+        }
+
         let response_text = response.text().await?;
         let layer_data: serde_json::Value = serde_json::from_str(&response_text)?;
 
-        if let Some(id) = layer_id_to_string(layer_data.get("id")) {
-            Ok(id)
+        if let Some(id) = layer_data.get("id").and_then(|v| v.as_str()) {
+            Ok(id.to_string())
         } else {
             Err(anyhow::anyhow!(
                 "Failed to create layer, response: {}",
