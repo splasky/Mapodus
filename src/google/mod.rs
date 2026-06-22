@@ -34,6 +34,44 @@ pub struct GooglePlace {
 }
 
 impl GooglePlace {
+    fn find_header_index(header_map: &std::collections::HashMap<String, usize>, english_name: &str) -> Option<usize> {
+        let lower = english_name.to_lowercase();
+
+        if let Some(&idx) = header_map.get(&lower) {
+            return Some(idx);
+        }
+
+        if let Some((_, &idx)) = header_map.iter().find(|(key, _)| key.contains(&lower)) {
+            return Some(idx);
+        }
+
+        let chinese_map: &[(&str, &str)] = &[
+            ("標題", "title"),
+            ("筆記", "notes"),
+            ("網址", "url"),
+            ("標籤", "tags"),
+            ("留言", "comments"),
+            ("緯度", "latitude"),
+            ("經度", "longitude"),
+            ("地點名稱", "place name"),
+            ("星級評分", "rating"),
+            ("網站", "website"),
+            ("簡介", "description"),
+            ("原文名稱", "original name"),
+            ("英文名稱", "english name"),
+        ];
+
+        for (cn, en) in chinese_map {
+            if *en == lower || *en == english_name.to_lowercase() {
+                if let Some(&idx) = header_map.get(&cn.to_string()) {
+                    return Some(idx);
+                }
+            }
+        }
+
+        None
+    }
+
     pub fn from_csv_record(record: &csv::StringRecord, headers: &csv::StringRecord) -> Self {
         let mut place = GooglePlace {
             title: None,
@@ -59,8 +97,8 @@ impl GooglePlace {
 
         macro_rules! set_field {
             ($field:ident, $header:expr) => {
-                if let Some(idx) = header_map.get(&$header.to_lowercase()) {
-                    place.$field = record.get(*idx).map(|s| s.to_string());
+                if let Some(idx) = Self::find_header_index(&header_map, $header) {
+                    place.$field = record.get(idx).map(|s| s.to_string());
                 }
             };
         }
@@ -120,6 +158,9 @@ pub fn parse_takeout(path: &str) -> Result<Vec<GooglePlace>> {
 
             for result in reader.records() {
                 let record = result?;
+                if record.iter().all(|f| f.is_empty()) {
+                    continue;
+                }
                 places.push(GooglePlace::from_csv_record(&record, &headers));
             }
 
