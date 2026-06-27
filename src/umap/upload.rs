@@ -73,15 +73,26 @@ impl UmapClient {
     ) -> Result<String> {
         let create_url = format!("{}/map/create/", self.base_url);
 
-        let center = Self::compute_center(fc)
-            .map(|(lon, lat)| {
-                serde_json::json!({"type": "Point", "coordinates": [lon, lat]}).to_string()
-            })
-            .unwrap_or_else(|| {
-                serde_json::json!({"type": "Point", "coordinates": [0.0, 0.0]}).to_string()
-            });
+        let (lon, lat) = Self::compute_center(fc).unwrap_or((0.0, 0.0));
+        let center = serde_json::json!({"type": "Point", "coordinates": [lon, lat]}).to_string();
+        let settings = serde_json::json!({
+            "geometry": {"type": "Point", "coordinates": [lon, lat]},
+            "properties": {
+                "zoom": 12,
+                "tilelayer": {
+                    "url_template": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    "attribution": "&copy; <a href=\"http://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors",
+                    "maxZoom": 19,
+                    "minZoom": 0
+                }
+            }
+        }).to_string();
 
-        let params = [("name", name.to_string()), ("center", center)];
+        let params = [
+            ("name", name.to_string()),
+            ("center", center),
+            ("settings", settings),
+        ];
         let response = self
             .client
             .post(&create_url)
@@ -108,8 +119,62 @@ impl UmapClient {
             .and_then(|v| v.as_u64())
             .ok_or_else(|| anyhow::anyhow!("No map id in create response: {}", json_text))?;
 
+        // Get owner ID from response to preserve it in permissions update
+        let owner_id = map_data
+            .get("permissions")
+            .and_then(|p| p.get("owner"))
+            .and_then(|o| o.get("id"))
+            .and_then(|v| v.as_u64());
+
         println!("Created map '{}' with ID: {}", name, map_id);
+
+        // Set map to public (share_status=1) so it's visible without login
+        if let Err(e) = self
+            .set_map_permissions(&map_id.to_string(), owner_id, auth)
+            .await
+        {
+            println!("Warning: Failed to set map permissions: {}", e);
+        }
+
         Ok(map_id.to_string())
+    }
+
+    pub async fn set_map_permissions(
+        &self,
+        map_id: &str,
+        owner_id: Option<u64>,
+        auth: &CookieAuth,
+    ) -> Result<()> {
+        let url = format!("{}/map/{}/update/permissions/", self.base_url, map_id);
+        let mut params: Vec<(&str, &str)> = vec![
+            ("share_status", "1"),
+            ("edit_status", "2"),
+        ];
+        let owner_str: String;
+        if let Some(oid) = owner_id {
+            owner_str = oid.to_string();
+            params.push(("owner", &owner_str));
+        }
+        let response = self
+            .client
+            .post(&url)
+            .headers(self.build_headers(auth))
+            .form(&params)
+            .send()
+            .await?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!(
+                "Failed to set map permissions ({}): {}",
+                status,
+                body
+            ));
+        }
+
+        println!("Set map permissions: public (visible to everyone)");
+        Ok(())
     }
 
     async fn find_existing_layer(
