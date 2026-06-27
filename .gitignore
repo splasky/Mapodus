@@ -24,7 +24,7 @@ target
 #.idea/
 
 # Credentials
-uMap_credentials
+.env
 
 # Project notes
 AGENTS.md
