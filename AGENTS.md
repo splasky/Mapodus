@@ -2,7 +2,7 @@
 
 ## Code Generation
 
-Use `@Qwen3.6-codegen` for writing, refactoring, or reviewing Rust code in this project. Do not use the default model for code generation tasks.
+Use `@Qwen3.6-codegen` for writing Rust code in this project. Do not use the default model for code generation tasks.
 
 ## Project Context
 
