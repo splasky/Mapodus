@@ -52,9 +52,9 @@
 3. **Application type**: 選取 **Web application**
 4. **Name**: 輸入名稱（例如 `google-maps-to-umap-dev`）
 5. **Authorized JavaScript origins**:
-   - `http://localhost:3000`
+   - `http://localhost:8900`
 6. **Authorized redirect URIs**:
-   - `http://localhost:3000/api/auth/google/callback`
+   - `http://localhost:8900/api/auth/google/callback`
 7. 點擊 **Create**
 
 完成後會彈出對話框顯示 **Client ID** 與 **Client Secret**，請複製並妥善保管。
