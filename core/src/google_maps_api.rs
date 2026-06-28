@@ -3,13 +3,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoogleList {
-    pub id: String,
-    pub title: String,
-    pub place_count: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoogleSavedPlace {
     pub title: Option<String>,
     pub address: Option<String>,
@@ -19,71 +12,6 @@ pub struct GoogleSavedPlace {
     pub notes: Option<String>,
     pub place_id: Option<String>,
     pub list: String,
-}
-
-struct ProtoWriter {
-    buf: Vec<u8>,
-}
-
-impl ProtoWriter {
-    fn new() -> Self {
-        ProtoWriter { buf: Vec::new() }
-    }
-
-    fn write_varint(&mut self, value: u64) {
-        let mut v = value;
-        loop {
-            if v < 0x80 {
-                self.buf.push(v as u8);
-                break;
-            }
-            self.buf.push((v as u8 & 0x7F) | 0x80);
-            v >>= 7;
-        }
-    }
-
-    fn write_tag(&mut self, field: u32, wire_type: u32) {
-        self.write_varint(((field << 3) | wire_type) as u64);
-    }
-
-    fn write_string(&mut self, field: u32, value: &str) {
-        self.write_tag(field, 2);
-        self.write_varint(value.len() as u64);
-        self.buf.extend_from_slice(value.as_bytes());
-    }
-
-    fn write_bool(&mut self, field: u32, value: bool) {
-        self.write_tag(field, 0);
-        self.write_varint(if value { 1 } else { 0 });
-    }
-
-    fn write_uint64(&mut self, field: u32, value: u64) {
-        self.write_tag(field, 0);
-        self.write_varint(value);
-    }
-
-    fn into_bytes(self) -> Vec<u8> {
-        self.buf
-    }
-}
-
-fn build_mas_request() -> Vec<u8> {
-    let mut w = ProtoWriter::new();
-    w.write_string(1, "en");
-    w.write_string(2, "US");
-    w.into_bytes()
-}
-
-fn build_getlist_request(list_id: &str, session_token: &str) -> Vec<u8> {
-    let mut w = ProtoWriter::new();
-    w.write_varint((1 << 3) | 0);
-    w.write_varint(1);
-    w.write_string(2, list_id);
-    w.write_bool(3, false);
-    w.write_bool(4, false);
-    w.write_string(11, session_token);
-    w.write_uint64(14, 1);
-    w.into_bytes()
 }
 
 pub struct GoogleMapsClient {
@@ -100,20 +28,24 @@ impl GoogleMapsClient {
         GoogleMapsClient { client, cookies }
     }
 
-    fn build_headers(&self) -> reqwest::header::HeaderMap {
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert("X-Same-Domain", "1".parse().unwrap());
-
-        let cookie_str = self
-            .cookies
+    fn cookie_string(&self) -> String {
+        self.cookies
             .iter()
             .map(|(k, v)| format!("{}={}", k, v))
             .collect::<Vec<_>>()
-            .join("; ");
+            .join("; ")
+    }
+
+    fn auth_headers(&self) -> reqwest::header::HeaderMap {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("X-Same-Domain", "1".parse().unwrap());
         headers.insert(
             reqwest::header::COOKIE,
-            cookie_str.parse().unwrap(),
+            self.cookie_string().parse().unwrap(),
         );
+        if let Some(auth) = self.sapisid_hash() {
+            headers.insert("Authorization", auth.parse().unwrap());
+        }
         headers
     }
 
@@ -125,198 +57,153 @@ impl GoogleMapsClient {
             .ok()?
             .as_secs();
         let input = format!("{} {}", timestamp, sapisid);
-        let hash = {
-            let digest = md5(input.as_bytes());
-            hex_encode(&digest)
-        };
+        let hash = hex_encode(&md5(input.as_bytes()));
         Some(format!("SAPISIDHASH {}_{}", timestamp, hash))
     }
 
-    pub async fn get_session_token(&self) -> Result<String, crate::error::AppError> {
-        let url = "https://maps.google.com/";
-        let mut headers = self.build_headers();
-        if let Some(auth) = self.sapisid_hash() {
-            headers.insert("Authorization", auth.parse().unwrap());
-        }
+    pub async fn get_all_saved_places(&self) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
+        let url = "https://www.google.com/maps/preview/entitylist/getlist";
+        let headers = self.auth_headers();
 
         let response = self
             .client
             .get(url)
+            .query(&[
+                ("authuser", "0"),
+                ("hl", "en"),
+                ("gl", "us"),
+            ])
             .headers(headers)
             .send()
             .await?;
-        let html = response.text().await?;
 
-        let token = extract_session_token(&html)
-            .ok_or_else(|| crate::error::AppError::Parse("Failed to extract session token from APP_OPTIONS".into()))?;
-        Ok(token)
-    }
-
-    pub async fn get_all_lists(&self, _session_token: &str) -> Result<Vec<GoogleList>, crate::error::AppError> {
-        let url = "https://www.google.com/locationhistory/preview/mas";
-        let mut headers = self.build_headers();
-        headers.insert(
-            reqwest::header::CONTENT_TYPE,
-            "application/x-javascript".parse().unwrap(),
-        );
-        if let Some(auth) = self.sapisid_hash() {
-            headers.insert("Authorization", auth.parse().unwrap());
-        }
-
-        let body = build_mas_request();
-        let response = self
-            .client
-            .post(url)
-            .headers(headers)
-            .body(body)
-            .send()
-            .await?;
+        let status = response.status();
         let data = response.bytes().await?;
 
-        let json_str = strip_garbage_prefix(&data);
-        let parsed: serde_json::Value = serde_json::from_str(json_str)?;
-
-        let lists = parse_lists_from_mas_response(&parsed)?;
-        Ok(lists)
-    }
-
-    pub async fn get_list_places(
-        &self,
-        list_id: &str,
-        session_token: &str,
-    ) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
-        let url = "https://www.google.com/maps/preview/entitylist/getlist";
-        let mut headers = self.build_headers();
-        headers.insert(
-            reqwest::header::CONTENT_TYPE,
-            "application/x-javascript".parse().unwrap(),
-        );
-        if let Some(auth) = self.sapisid_hash() {
-            headers.insert("Authorization", auth.parse().unwrap());
+        if !status.is_success() {
+            let preview = String::from_utf8_lossy(&data[..data.len().min(200)]);
+            return Err(crate::error::AppError::Http(format!(
+                "getlist endpoint returned {}: {}",
+                status, preview
+            )));
         }
 
-        let body = build_getlist_request(list_id, session_token);
-        let response = self
-            .client
-            .post(url)
-            .headers(headers)
-            .body(body)
-            .send()
-            .await?;
-        let data = response.bytes().await?;
+        let json_str = strip_xssi(&data).ok_or_else(|| {
+            let preview = String::from_utf8_lossy(&data[..data.len().min(500)]);
+            crate::error::AppError::Parse(format!(
+                "Response is not valid UTF-8. Body preview: {}",
+                preview
+            ))
+        })?;
 
-        let json_str = strip_garbage_prefix(&data);
-        let parsed: serde_json::Value = serde_json::from_str(json_str)?;
+        let parsed: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
+            let preview = if json_str.len() > 500 { &json_str[..500] } else { json_str };
+            crate::error::AppError::Parse(format!(
+                "JSON parse error: {}. Body: {}",
+                e, preview
+            ))
+        })?;
 
-        let places = parse_places_from_getlist_response(&parsed, list_id)?;
+        let places = parse_saved_response(&parsed)?;
         Ok(places)
-    }
-
-    pub async fn collect_all(
-        &self,
-    ) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
-        let session_token = self.get_session_token().await?;
-        let lists = self.get_all_lists(&session_token).await?;
-
-        let mut all_places = Vec::new();
-        for list in &lists {
-            match self.get_list_places(&list.id, &session_token).await {
-                Ok(places) => all_places.extend(places),
-                Err(e) => {
-                    eprintln!("Warning: failed to fetch list '{}': {}", list.title, e);
-                }
-            }
-        }
-        Ok(all_places)
     }
 }
 
-fn strip_garbage_prefix(data: &[u8]) -> &str {
-    let start = if data.len() > 4 && data[0] == b')' && data[1] == b']' {
+fn strip_xssi(data: &[u8]) -> Option<&str> {
+    let start = if data.len() > 5 && &data[..5] == b")]}'\n" {
+        5
+    } else if data.len() > 4 && &data[..4] == b")]}" {
         4
     } else {
         0
     };
-    std::str::from_utf8(&data[start..]).unwrap_or("")
+    let s = std::str::from_utf8(&data[start..]).ok()?;
+    Some(s.trim())
 }
 
-fn parse_lists_from_mas_response(value: &serde_json::Value) -> Result<Vec<GoogleList>, crate::error::AppError> {
-    let mut lists = Vec::new();
-    if let Some(entries) = value.get("entries").and_then(|v| v.as_array()) {
-        for entry in entries {
-            if let Some(list_data) = entry.get("1").and_then(|v| v.get("1")) {
-                let id = list_data
-                    .get("1")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let title = entry
-                    .get("1")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown")
-                    .to_string();
-                let place_count = entry
-                    .get("4")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0) as u32;
-
-                if !id.is_empty() {
-                    lists.push(GoogleList {
-                        id,
-                        title,
-                        place_count,
-                    });
-                }
-            }
-        }
-    }
-    Ok(lists)
-}
-
-fn parse_places_from_getlist_response(
-    value: &serde_json::Value,
-    list_name: &str,
-) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
+fn parse_saved_response(value: &serde_json::Value) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
     let mut places = Vec::new();
-    if let Some(items) = value.get("1").and_then(|v| v.as_array()) {
-        for item in items {
-            if let Some(place_data) = item.get("1") {
-                let title = place_data
-                    .get("1")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let address = place_data
-                    .get("2")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let place_id = place_data
-                    .get("3")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let latitude = place_data.get("4").and_then(|v| v.as_f64());
-                let longitude = place_data.get("5").and_then(|v| v.as_f64());
-                let url = place_data
-                    .get("6")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let notes = place_data
-                    .get("7")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
 
-                places.push(GoogleSavedPlace {
-                    title,
-                    address,
-                    latitude,
-                    longitude,
-                    url,
-                    notes,
-                    place_id,
-                    list: list_name.to_string(),
-                });
+    // Response structure: [ [ list_name, ... entries ..., [ [ place, ... ] ] ] ]
+    // From the Firefox extension and gmaps-list research:
+    //   root[4] = list name
+    //   root[8] = array of place entries
+    //   Each entry: [ place_info, name, comment, ... ]
+    //     entry[2] = name
+    //     entry[3] = comment/notes
+    //     entry[1] = place_info array:
+    //       [ _, address?, _, _, _, [_, _, lat, lng], _, place_id, ... ]
+    //       place_info[2] = address (sometimes)
+    //       place_info[5] = [_, _, lat, lng]
+    //       place_info[7] = place_id
+
+    let root = value.as_array().and_then(|a| a.first())
+        .and_then(|v| v.as_array());
+
+    let root = match root {
+        Some(r) => r,
+        None => return Ok(places),
+    };
+
+    let list_name = root.get(4)
+        .and_then(|v| v.as_str())
+        .unwrap_or("Imported")
+        .to_string();
+
+    let entries = root.get(8).and_then(|v| v.as_array());
+
+    if let Some(items) = entries {
+        for item in items {
+            let arr = match item.as_array() {
+                Some(a) => a,
+                None => continue,
+            };
+
+            let name = arr.get(2).and_then(|v| v.as_str()).unwrap_or("");
+            if name.is_empty() {
+                continue;
             }
+
+            let place_info = arr.get(1).and_then(|v| v.as_array());
+
+            let address = place_info.and_then(|pi| {
+                pi.get(2).and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| pi.get(4).and_then(|v| v.as_str()).filter(|s| !s.is_empty()))
+            }).map(|s| s.to_string());
+
+            let coords = place_info.and_then(|pi| {
+                pi.get(5).and_then(|v| v.as_array())
+            });
+
+            let latitude = coords.and_then(|c| c.get(2).and_then(|v| v.as_f64()));
+            let longitude = coords.and_then(|c| c.get(3).and_then(|v| v.as_f64()));
+
+            let place_id = place_info
+                .and_then(|pi| pi.get(7).and_then(|v| v.as_str()))
+                .map(|s| s.to_string());
+
+            let url = place_id.as_ref().map(|id| {
+                format!("https://www.google.com/maps/place/?q=place_id:{}", id)
+            });
+
+            let notes = arr.get(3).and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string());
+
+            places.push(GoogleSavedPlace {
+                title: Some(name.to_string()),
+                address,
+                latitude,
+                longitude,
+                url,
+                notes,
+                place_id,
+                list: list_name.clone(),
+            });
         }
     }
+
     Ok(places)
 }
 
@@ -457,45 +344,4 @@ impl Md5State {
         state[2] = state[2].wrapping_add(c);
         state[3] = state[3].wrapping_add(d);
     }
-}
-
-fn extract_session_token(html: &str) -> Option<String> {
-    let marker = "window.APP_OPTIONS";
-    let start = html.find(marker)?;
-    let after_marker = &html[start + marker.len()..];
-    let bracket_start = after_marker.find('[')?;
-    let depth = find_matching_bracket(after_marker, bracket_start)?;
-    let array_str = &after_marker[bracket_start..=depth];
-
-    if let Ok(value) = serde_json::from_str::<serde_json::Value>(array_str) {
-        if let Some(arr) = value.as_array() {
-            if let Some(token) = arr.get(11) {
-                if let Some(s) = token.as_str() {
-                    return Some(s.to_string());
-                }
-            }
-        }
-    }
-    None
-}
-
-fn find_matching_bracket(s: &str, open: usize) -> Option<usize> {
-    let bytes = s.as_bytes();
-    if open >= bytes.len() || bytes[open] != b'[' {
-        return None;
-    }
-    let mut depth = 0u32;
-    for i in open..bytes.len() {
-        match bytes[i] {
-            b'[' => depth += 1,
-            b']' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
 }
