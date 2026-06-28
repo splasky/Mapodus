@@ -1,11 +1,12 @@
 <script lang="ts">
   import Login from './lib/components/Login.svelte';
   import Upload from './lib/components/Upload.svelte';
+  import GoogleImport from './lib/components/GoogleImport.svelte';
   import Bookmarks from './lib/components/Bookmarks.svelte';
   import ConnectUmap from './lib/components/ConnectUmap.svelte';
   import Transfer from './lib/components/Transfer.svelte';
 
-  let step = $state<'login' | 'upload' | 'bookmarks' | 'connect' | 'transfer'>('login');
+  let step = $state<'login' | 'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer'>('login');
   let loggedIn = $state(false);
   let umapConnected = $state(false);
   let bookmarksUploaded = $state(false);
@@ -15,6 +16,13 @@
     step = 'upload';
   }
   function onUpload() {
+    bookmarksUploaded = true;
+    step = 'bookmarks';
+  }
+  function onGoogleImport() {
+    step = 'google-import';
+  }
+  function onImportDone() {
     bookmarksUploaded = true;
     step = 'bookmarks';
   }
@@ -43,8 +51,8 @@
     <div class="step {step === 'login' ? 'active' : ''} {loggedIn ? 'done' : ''}">
       <span class="step-num">1</span> Sign In
     </div>
-    <div class="step {step === 'upload' ? 'active' : ''} {bookmarksUploaded ? 'done' : ''}">
-      <span class="step-num">2</span> Upload CSV
+    <div class="step {step === 'upload' || step === 'google-import' ? 'active' : ''} {bookmarksUploaded ? 'done' : ''}">
+      <span class="step-num">2</span> Import
     </div>
     <div class="step {step === 'bookmarks' ? 'active' : ''}">
       <span class="step-num">3</span> Select Bookmarks
@@ -60,7 +68,9 @@
   {#if step === 'login'}
     <Login onLogin={onLogin} />
   {:else if step === 'upload'}
-    <Upload onUpload={onUpload} />
+    <Upload {onUpload} {onGoogleImport} />
+  {:else if step === 'google-import'}
+    <GoogleImport onImport={onImportDone} />
   {:else if step === 'bookmarks'}
     <Bookmarks onSelect={onSelect} />
   {:else if step === 'connect'}
