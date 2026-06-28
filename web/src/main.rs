@@ -87,7 +87,7 @@ async fn run_dev_import(cookies_str: &str) {
     }
 
     let client = GoogleMapsClient::new(cookies);
-    match client.collect_all().await {
+    match client.get_all_saved_places().await {
         Ok(places) => {
             println!("\nSuccess! Imported {} places total.\n", places.len());
 

@@ -46,7 +46,7 @@ pub async fn import(
 ) -> Result<impl IntoResponse, ApiError> {
     let client = GoogleMapsClient::new(req.cookies);
     let all_places = client
-        .collect_all()
+        .get_all_saved_places()
         .await
         .map_err(|e| ApiError::Internal(format!("Google API error: {}", e)))?;
 
