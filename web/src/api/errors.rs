@@ -28,3 +28,21 @@ impl From<anyhow::Error> for ApiError {
         ApiError::Internal(e.to_string())
     }
 }
+
+impl From<reqwest::Error> for ApiError {
+    fn from(e: reqwest::Error) -> Self {
+        ApiError::Internal(e.to_string())
+    }
+}
+
+impl From<serde_json::Error> for ApiError {
+    fn from(e: serde_json::Error) -> Self {
+        ApiError::BadRequest(e.to_string())
+    }
+}
+
+impl From<tower_sessions::session::Error> for ApiError {
+    fn from(e: tower_sessions::session::Error) -> Self {
+        ApiError::Internal(e.to_string())
+    }
+}

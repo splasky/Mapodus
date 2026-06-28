@@ -1,10 +1,10 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use super::auth::CookieAuth;
 
 fn layer_id_to_string(id: Option<&serde_json::Value>) -> Option<String> {
     id.and_then(|v| {
         v.as_str()
-            .map(|s| s.to_string())
+            .map(str::to_owned)
             .or_else(|| v.as_i64().map(|n| n.to_string()))
             .or_else(|| v.as_f64().map(|n| n.to_string()))
     })
@@ -18,7 +18,7 @@ pub struct UmapClient {
 
 impl UmapClient {
     pub fn new(base_url: &str) -> Self {
-        UmapClient {
+        Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             client: reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
@@ -39,16 +39,30 @@ impl UmapClient {
     }
 
     fn compute_center(fc: &geojson::FeatureCollection) -> Option<(f64, f64)> {
-        for feature in &fc.features {
-            if let Some(geometry) = &feature.geometry {
-                if let geojson::Value::Point(coords) = &geometry.value {
-                    if coords.len() >= 2 {
-                        return Some((coords[0], coords[1]));
-                    }
-                }
+        fc.features.iter().find_map(|feature| {
+            let geometry = feature.geometry.as_ref()?;
+            match &geometry.value {
+                geojson::Value::Point(coords) if coords.len() >= 2 => Some((coords[0], coords[1])),
+                _ => None,
             }
+        })
+    }
+
+    pub async fn validate_session(&self, auth: &CookieAuth) -> Result<()> {
+        let response = self
+            .client
+            .get(format!("{}/", self.base_url))
+            .headers(self.build_headers(auth))
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            Err(anyhow!("uMap session validation failed ({status}): {body}"))
         }
-        None
     }
 
     pub async fn create_map(
@@ -131,15 +145,12 @@ impl UmapClient {
         edit_status: u32,
     ) -> Result<()> {
         let url = format!("{}/map/{}/update/permissions/", self.base_url, map_id);
-        let owner_str = owner_id.map(|o| o.to_string());
-        let share = share_status.to_string();
-        let edit = edit_status.to_string();
-        let mut params: Vec<(&str, &str)> = vec![
-            ("share_status", share.as_str()),
-            ("edit_status", edit.as_str()),
+        let mut params = vec![
+            ("share_status", share_status.to_string()),
+            ("edit_status", edit_status.to_string()),
         ];
-        if let Some(ref o) = owner_str {
-            params.push(("owner", o));
+        if let Some(owner_id) = owner_id {
+            params.push(("owner", owner_id.to_string()));
         }
         let response = self
             .client
