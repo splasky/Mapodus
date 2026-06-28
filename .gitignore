@@ -33,6 +33,9 @@ AGENTS-test.md
 # Node.js
 frontend/node_modules/
 
+# Vendored uMap (git submodule without .gitmodules)
+umap/
+
 # Vim swap files
 *.swp
 
