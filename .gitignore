@@ -29,3 +29,12 @@ target
 # Project notes
 AGENTS.md
 AGENTS-test.md
+
+# Node.js
+frontend/node_modules/
+
+# Vim swap files
+*.swp
+
+# Agent session files
+session-ses_*.md

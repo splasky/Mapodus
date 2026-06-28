@@ -1,19 +1,5 @@
-// Copyright 2025 google-maps-to-umap Contributors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-use super::auth::CookieAuth;
 use anyhow::Result;
+use super::auth::CookieAuth;
 
 fn layer_id_to_string(id: Option<&serde_json::Value>) -> Option<String> {
     id.and_then(|v| {
@@ -119,18 +105,15 @@ impl UmapClient {
             .and_then(|v| v.as_u64())
             .ok_or_else(|| anyhow::anyhow!("No map id in create response: {}", json_text))?;
 
-        // Get owner ID from response to preserve it in permissions update
         let owner_id = map_data
             .get("permissions")
             .and_then(|p| p.get("owner"))
             .and_then(|o| o.get("id"))
             .and_then(|v| v.as_u64());
 
-        println!("Created map '{}' with ID: {}", name, map_id);
-
-        // Set map to public (share_status=1) so it's visible without login
+        // Set map to DRAFT (private, share_status=0)
         if let Err(e) = self
-            .set_map_permissions(&map_id.to_string(), owner_id, auth)
+            .set_map_permissions(&map_id.to_string(), owner_id, auth, 0, 3) // DRAFT, OWNER
             .await
         {
             println!("Warning: Failed to set map permissions: {}", e);
@@ -144,16 +127,19 @@ impl UmapClient {
         map_id: &str,
         owner_id: Option<u64>,
         auth: &CookieAuth,
+        share_status: u32,
+        edit_status: u32,
     ) -> Result<()> {
         let url = format!("{}/map/{}/update/permissions/", self.base_url, map_id);
+        let owner_str = owner_id.map(|o| o.to_string());
+        let share = share_status.to_string();
+        let edit = edit_status.to_string();
         let mut params: Vec<(&str, &str)> = vec![
-            ("share_status", "1"),
-            ("edit_status", "2"),
+            ("share_status", share.as_str()),
+            ("edit_status", edit.as_str()),
         ];
-        let owner_str: String;
-        if let Some(oid) = owner_id {
-            owner_str = oid.to_string();
-            params.push(("owner", &owner_str));
+        if let Some(ref o) = owner_str {
+            params.push(("owner", o));
         }
         let response = self
             .client
@@ -172,8 +158,6 @@ impl UmapClient {
                 body
             ));
         }
-
-        println!("Set map permissions: public (visible to everyone)");
         Ok(())
     }
 
@@ -222,17 +206,15 @@ impl UmapClient {
         layer_name: &str,
         auth: &CookieAuth,
     ) -> Result<String> {
-        // Try to find existing layer
         if let Some(id) = self
             .find_existing_layer(map_id, layer_name, auth)
             .await?
         {
-            println!("Found existing layer '{}' with ID: {}", layer_name, id);
             return Ok(id);
         }
 
         Err(anyhow::anyhow!(
-            "No existing layer '{}' found on map {}. Use --layer-name with a layer that already exists, or skip this flag to use the default.",
+            "No existing layer '{}' found on map {}.",
             layer_name, map_id
         ))
     }
@@ -280,13 +262,7 @@ impl UmapClient {
         }
 
         let response_text = response.text().await?;
-        let layer_data: serde_json::Value = serde_json::from_str(&response_text)?;
-
-        let _id_check = layer_id_to_string(layer_data.get("id"))
-            .ok_or_else(|| anyhow::anyhow!(
-                "Failed to create layer, response: {}",
-                response_text
-            ))?;
+        let _layer_data: serde_json::Value = serde_json::from_str(&response_text)?;
 
         self.upload_geojson(map_id, &layer_id, layer_name, geojson, auth).await?;
 

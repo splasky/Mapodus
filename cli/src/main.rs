@@ -1,25 +1,7 @@
-// Copyright 2025 google-maps-to-umap Contributors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 use anyhow::Result;
 use clap::Parser;
 
 mod cli;
-mod convert;
-mod error;
-mod google;
-mod umap;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -27,12 +9,12 @@ async fn main() -> Result<()> {
     args.validate()?;
 
     let feature_collection = if let Some(takeout_path) = &args.takeout {
-        let places = google::parse_takeout(takeout_path)?;
+        let places = umap_core::google::parse_takeout(takeout_path)?;
 
         if args.umap_map_id.is_some() || args.create_map.is_some() {
-            convert::Converter::to_umap_geojson(&places)
+            umap_core::convert::Converter::to_umap_geojson(&places)
         } else {
-            convert::Converter::to_geojson(&places)
+            umap_core::convert::Converter::to_geojson(&places)
         }
     } else if let Some(geojson_path) = &args.geojson {
         let content = std::fs::read_to_string(geojson_path)?;
@@ -48,7 +30,7 @@ async fn main() -> Result<()> {
     }
 
     let cookie_str = args.umap_cookie.as_ref();
-    let auth = cookie_str.map(|s| umap::CookieAuth::from_cookie_str(s).unwrap());
+    let auth = cookie_str.map(|s| umap_core::umap::CookieAuth::from_cookie_str(s).unwrap());
 
     let map_id: String;
 
@@ -56,7 +38,7 @@ async fn main() -> Result<()> {
         let auth = auth
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("umap-cookie required for --create-map"))?;
-        let client = umap::UmapClient::new(&args.umap_url);
+        let client = umap_core::umap::UmapClient::new(&args.umap_url);
         map_id = client.create_map(new_map_name, &feature_collection, auth).await?;
     } else if let Some(existing_id) = &args.umap_map_id {
         map_id = existing_id.clone();
@@ -65,7 +47,7 @@ async fn main() -> Result<()> {
     }
 
     if let Some(auth) = &auth {
-        let client = umap::UmapClient::new(&args.umap_url);
+        let client = umap_core::umap::UmapClient::new(&args.umap_url);
 
         let layer_id = match client
             .find_or_create_layer(&map_id, &args.layer_name, auth)
@@ -78,10 +60,6 @@ async fn main() -> Result<()> {
                 id
             }
             Err(_) => {
-                println!(
-                    "Creating new layer '{}' on map {}",
-                    args.layer_name, map_id
-                );
                 let layer_id = client
                     .create_and_upload_layer(
                         &map_id,
@@ -105,11 +83,11 @@ async fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::convert::Converter;
-    use crate::google;
+    use umap_core::convert::Converter;
+    use umap_core::google;
 
     fn test_data_path(filename: &str) -> String {
-        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples");
+        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("examples");
         base.join(filename).to_string_lossy().to_string()
     }
 
@@ -117,31 +95,22 @@ mod tests {
     fn test_parse_original_csv() {
         let path = test_data_path("2026北海道.csv");
         let places = google::parse_takeout(&path).unwrap();
-        assert_eq!(places.len(), 49, "expected 49 data rows");
+        assert_eq!(places.len(), 49);
         let first = &places[0];
-        assert_eq!(
-            first.title.as_deref(),
-            Some("MYSTAYS 札幌公園精品酒店")
-        );
-        assert!(
-            first.url.as_deref().unwrap_or("").starts_with("https://www.google.com/maps/"),
-            "URL should start with expected prefix"
-        );
+        assert_eq!(first.title.as_deref(), Some("MYSTAYS 札幌公園精品酒店"));
+        assert!(first.url.as_deref().unwrap_or("").starts_with("https://www.google.com/maps/"));
     }
 
     #[test]
     fn test_parse_updated_csv() {
         let path = test_data_path("2026北海道_updated.csv");
         let places = google::parse_takeout(&path).unwrap();
-        assert_eq!(places.len(), 49, "expected 49 data rows");
+        assert_eq!(places.len(), 49);
         let first = &places[0];
         assert_eq!(first.latitude.as_deref(), Some("43.0495311"));
         assert_eq!(first.longitude.as_deref(), Some("141.3569474"));
         assert_eq!(first.rating.as_deref(), Some("4"));
-        assert_eq!(
-            first.english_name.as_deref(),
-            Some("HOTEL MYSTAYS PREMIER Sapporo Park")
-        );
+        assert_eq!(first.english_name.as_deref(), Some("HOTEL MYSTAYS PREMIER Sapporo Park"));
     }
 
     #[test]
@@ -149,31 +118,22 @@ mod tests {
         let path = test_data_path("2026北海道_updated.csv");
         let places = google::parse_takeout(&path).unwrap();
         let fc = Converter::to_umap_geojson(&places);
-        assert_eq!(fc.features.len(), 49, "expected 49 features");
+        assert_eq!(fc.features.len(), 49);
 
         let first_feature = &fc.features[0];
         let props = first_feature.properties.as_ref().unwrap();
 
-        assert_eq!(
-            props.get("name").and_then(|v| v.as_str()),
-            Some("MYSTAYS 札幌公園精品酒店")
-        );
+        assert_eq!(props.get("name").and_then(|v| v.as_str()), Some("MYSTAYS 札幌公園精品酒店"));
 
         let desc = props.get("description").and_then(|v| v.as_str()).unwrap_or("");
-        assert!(
-            desc.contains("名稱: MYSTAYS 札幌公園精品酒店"),
-            "description should contain 名稱"
-        );
-        assert!(
-            desc.contains("English: HOTEL MYSTAYS PREMIER Sapporo Park"),
-            "description should contain English name"
-        );
+        assert!(desc.contains("名稱: MYSTAYS 札幌公園精品酒店"));
+        assert!(desc.contains("English: HOTEL MYSTAYS PREMIER Sapporo Park"));
 
         let geometry = first_feature.geometry.as_ref().unwrap();
         match &geometry.value {
             geojson::Value::Point(coords) => {
-                assert!((coords[0] - 141.3569474).abs() < 1e-7, "longitude mismatch");
-                assert!((coords[1] - 43.0495311).abs() < 1e-7, "latitude mismatch");
+                assert!((coords[0] - 141.3569474).abs() < 1e-7);
+                assert!((coords[1] - 43.0495311).abs() < 1e-7);
             }
             _ => panic!("expected Point geometry"),
         }
@@ -189,11 +149,7 @@ mod tests {
         let content = std::fs::read_to_string(&expected_path).unwrap();
         let expected: geojson::FeatureCollection = serde_json::from_str(&content).unwrap();
 
-        assert_eq!(
-            fc.features.len(),
-            expected.features.len(),
-            "feature count mismatch"
-        );
+        assert_eq!(fc.features.len(), expected.features.len());
 
         if let (Some(first_fc), Some(first_exp)) = (fc.features.first(), expected.features.first()) {
             let fc_coords = first_fc.geometry.as_ref().and_then(|g| match &g.value {
@@ -204,7 +160,7 @@ mod tests {
                 geojson::Value::Point(c) => Some(c),
                 _ => None,
             });
-            assert_eq!(fc_coords, exp_coords, "first feature coords mismatch");
+            assert_eq!(fc_coords, exp_coords);
         }
 
         if let (Some(last_fc), Some(last_exp)) = (fc.features.last(), expected.features.last()) {
@@ -216,7 +172,7 @@ mod tests {
                 geojson::Value::Point(c) => Some(c),
                 _ => None,
             });
-            assert_eq!(fc_coords, exp_coords, "last feature coords mismatch");
+            assert_eq!(fc_coords, exp_coords);
         }
     }
 }
