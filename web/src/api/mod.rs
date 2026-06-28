@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod bookmarks;
 pub mod errors;
+pub mod google_import;
 pub mod umap;
 
 use axum::Router;
@@ -15,4 +16,6 @@ pub fn routes() -> Router {
         .route("/api/umap/connect", axum::routing::post(umap::connect))
         .route("/api/umap/status", axum::routing::get(umap::status))
         .route("/api/transfer", axum::routing::post(umap::transfer))
+        .route("/api/google/import", axum::routing::post(google_import::import))
+        .route("/api/google/confirm", axum::routing::post(google_import::confirm))
 }

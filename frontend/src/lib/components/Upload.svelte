@@ -1,7 +1,7 @@
 <script lang="ts">
   import { apiPost } from '../api';
 
-  let { onUpload }: { onUpload: () => void } = $props();
+  let { onUpload, onGoogleImport }: { onUpload: () => void; onGoogleImport?: () => void } = $props();
   let error = $state('');
   let uploading = $state(false);
   let dragging = $state(false);
@@ -79,6 +79,13 @@
     onchange={onFileInput}
     style="display: none"
   />
+
+  {#if onGoogleImport}
+    <div class="divider"><span>or</span></div>
+    <button class="alt-btn" onclick={onGoogleImport}>
+      Import directly from Google Maps
+    </button>
+  {/if}
 </div>
 
 <style>
@@ -94,6 +101,36 @@
   .drop-zone.dragging {
     border-color: #2563eb;
     background: #eff6ff;
+    color: #2563eb;
+  }
+  .divider {
+    display: flex;
+    align-items: center;
+    margin: 1.2rem 0;
+    color: #94a3b8;
+    font-size: 0.85rem;
+  }
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .divider span {
+    padding: 0 0.8rem;
+  }
+  .alt-btn {
+    width: 100%;
+    padding: 0.7rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    background: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+  .alt-btn:hover {
+    border-color: #2563eb;
     color: #2563eb;
   }
 </style>

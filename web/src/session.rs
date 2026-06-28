@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use umap_core::google::GooglePlace;
+use umap_core::google_maps_api::GoogleSavedPlace;
 use umap_core::umap::CookieAuth;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,6 +18,7 @@ pub struct AppSession {
     pub selected_ids: Option<Vec<usize>>,
     pub umap_auth: Option<CookieAuth>,
     pub umap_url: Option<String>,
+    pub google_places: Option<Vec<GoogleSavedPlace>>,
 }
 
 impl AppSession {

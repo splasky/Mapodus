@@ -27,3 +27,15 @@ impl From<anyhow::Error> for AppError {
         AppError::Config(error.to_string())
     }
 }
+
+impl From<reqwest::Error> for AppError {
+    fn from(error: reqwest::Error) -> Self {
+        AppError::Http(error.to_string())
+    }
+}
+
+impl From<serde_json::Error> for AppError {
+    fn from(error: serde_json::Error) -> Self {
+        AppError::Parse(error.to_string())
+    }
+}
