@@ -18,4 +18,5 @@ pub fn routes() -> Router {
         .route("/api/transfer", axum::routing::post(umap::transfer))
         .route("/api/google/import", axum::routing::post(google_import::import))
         .route("/api/google/confirm", axum::routing::post(google_import::confirm))
+        .route("/api/google/debug", axum::routing::post(google_import::debug_import))
 }

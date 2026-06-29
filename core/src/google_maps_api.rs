@@ -100,22 +100,44 @@ impl GoogleMapsClient {
         let data = response.bytes().await?;
         if !status.is_success() {
             let preview = String::from_utf8_lossy(&data[..data.len().min(500)]);
+            eprintln!("[MAS] HTTP {} response (first 500): {}", status, preview);
             return Err(crate::error::AppError::Http(format!(
                 "MAS endpoint returned {}: {}",
                 status, preview
             )));
         }
-        let body = strip_xssi(&data).ok_or_else(|| {
+        let body = strip_xssi_bytes(&data).ok_or_else(|| {
             crate::error::AppError::Parse("MAS response is not valid UTF-8".into())
         })?;
+        // Log response summary for debugging
+        eprintln!("[MAS] 200 OK, response length={} stripped, first 200: {}",
+            body.len(),
+            &body[..body.len().min(200)]);
         let json: serde_json::Value = serde_json::from_str(body).map_err(|e| {
+            let preview = &body[..body.len().min(500)];
+            eprintln!("[MAS] JSON parse error: {}. Body: {}", e, preview);
             crate::error::AppError::Parse(format!(
                 "MAS JSON parse error: {}. Body (first 500): {}",
-                e,
-                &body[..body.len().min(500)]
+                e, preview
             ))
         })?;
-        parse_mas_lists(&json)
+        let lists = parse_mas_lists(&json)?;
+        eprintln!("[MAS] Parsed {} saved lists", lists.len());
+        if lists.is_empty() {
+            // Dump the top-level structure for debugging
+            if let Some(root) = json.as_array() {
+                eprintln!("[MAS] Top-level array has {} elements", root.len());
+                for (i, elem) in root.iter().enumerate() {
+                    if elem.is_array() {
+                        let arr = elem.as_array().unwrap();
+                        eprintln!("  [{}] array(len={})", i, arr.len());
+                    } else if !elem.is_null() {
+                        eprintln!("  [{}] {}", i, elem);
+                    }
+                }
+            }
+        }
+        Ok(lists)
     }
 
     /// Get places for a specific list using its placelists page.
@@ -143,7 +165,7 @@ impl GoogleMapsClient {
                 status, list_name, preview
             )));
         }
-        let body = strip_xssi(&data).ok_or_else(|| {
+        let body = strip_xssi_bytes(&data).ok_or_else(|| {
             crate::error::AppError::Parse(format!(
                 "getlist response not valid UTF-8 for list '{}'",
                 list_name
@@ -157,6 +179,44 @@ impl GoogleMapsClient {
             ))
         })?;
         parse_getlist_places(&json, list_name)
+    }
+
+    /// Debug: call the MAS endpoint and return the raw response text + status.
+    pub async fn debug_mas(&self) -> Result<(u16, String), crate::error::AppError> {
+        let pb = build_mas_pb();
+        let url = "https://www.google.com/locationhistory/preview/mas";
+        let response = self
+            .client
+            .get(url)
+            .query(&[("authuser", "0"), ("hl", "en"), ("gl", "us"), ("pb", &pb)])
+            .headers(self.request_headers())
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        let data = response.bytes().await?;
+        let body = String::from_utf8_lossy(&data).to_string();
+        Ok((status, body))
+    }
+
+    /// Debug: call the entitylist/getlist endpoint and return raw response.
+    pub async fn debug_getlist(
+        &self,
+        list_id: &str,
+    ) -> Result<(u16, String), crate::error::AppError> {
+        let url = format!(
+            "https://www.google.com/maps/preview/entitylist/getlist?authuser=0&hl=en&gl=us&pb=!1m2!1s{}!2s0",
+            list_id
+        );
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.request_headers())
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        let data = response.bytes().await?;
+        let body = String::from_utf8_lossy(&data).to_string();
+        Ok((status, body))
     }
 
     /// High-level: get all places from all saved lists.
@@ -271,7 +331,19 @@ fn build_mas_pb() -> String {
 
 // ── Response parsing ──
 
-fn strip_xssi(data: &[u8]) -> Option<&str> {
+pub fn strip_xssi(data: &str) -> Option<&str> {
+    let bytes = data.as_bytes();
+    let start = if bytes.len() > 5 && &bytes[..5] == b")]}'\n" {
+        5
+    } else if bytes.len() > 4 && &bytes[..4] == b")]}" {
+        4
+    } else {
+        0
+    };
+    Some(&data[start..].trim())
+}
+
+fn strip_xssi_bytes(data: &[u8]) -> Option<&str> {
     let start = if data.len() > 5 && &data[..5] == b")]}'\n" {
         5
     } else if data.len() > 4 && &data[..4] == b")]}" {
