@@ -53,3 +53,6 @@ client_secret_*.json
 
 # Frontend build artifacts (hash changes every build)
 web/static/assets/*
+
+# opencode config
+opencode.json
