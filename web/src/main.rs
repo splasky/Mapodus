@@ -119,6 +119,7 @@ async fn run_dev_import(cookies_str: &str) {
 
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().ok();
     let args = Args::parse();
 
     if let Some(ref cookies) = args.google_cookies {
