@@ -1,8 +1,8 @@
 <script lang="ts">
   import { apiPost } from '../api';
 
-  let { onConnect }: { onConnect: () => void } = $props();
-  let umapUrl = $state('http://localhost:8000/en/');
+  let { onConnect, onPrev, onNext }: { onConnect: () => void; onPrev?: () => void; onNext?: () => void } = $props();
+  let umapUrl = $state('https://umap.openstreetmap.fr/en/');
   let username = $state('');
   let password = $state('');
   let connecting = $state(false);
@@ -47,7 +47,12 @@
     <input type="password" bind:value={password} placeholder="your uMap password" />
   </label>
 
-  <button onclick={connect} disabled={connecting}>
+    <button class="primary" onclick={connect} disabled={connecting}>
     {connecting ? 'Connecting...' : 'Connect'}
   </button>
+
+  <div class="nav-row">
+    <button class="nav-prev" onclick={onPrev}>Previous</button>
+    <button class="nav-next" onclick={onNext}>Next</button>
+  </div>
 </div>
