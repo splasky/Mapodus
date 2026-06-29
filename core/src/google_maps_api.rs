@@ -151,13 +151,16 @@ impl GoogleMapsClient {
         list_id: &str,
         list_name: &str,
     ) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
-        let url = format!(
-            "https://www.google.com/maps/preview/entitylist/getlist?authuser=0&hl=en&gl=us&pb=!1m2!1s{}!2s0",
-            list_id
+        let token = self.sapisid_value().map(compute_mas_token).unwrap_or_else(|| "A".into());
+        let pb = format!(
+            "!1m4!1s{id}!2e1!3m1!1e1!2e2!3e2!4i500!6m3!1s{token}!7e81!28e2!18i3!16b1",
+            id = list_id, token = token
         );
+        let url = "https://www.google.com/maps/preview/entitylist/getlist";
         let response = self
             .client
-            .get(&url)
+            .get(url)
+            .query(&[("authuser", "0"), ("hl", "en"), ("gl", "us"), ("pb", &pb)])
             .headers(self.request_headers())
             .send()
             .await?;
@@ -183,7 +186,12 @@ impl GoogleMapsClient {
                 list_name, e, preview
             ))
         })?;
-        parse_getlist_places(&json, list_name)
+        let places = parse_getlist_places(&json, list_name)?;
+        if places.is_empty() {
+            eprintln!("[getlist] '{}' returned 0 places. Raw response (first 500): {}",
+                list_name, &body[..body.len().min(500)]);
+        }
+        Ok(places)
     }
 
     /// Debug: call the MAS endpoint and return the raw response text + status.
@@ -209,13 +217,16 @@ impl GoogleMapsClient {
         &self,
         list_id: &str,
     ) -> Result<(u16, String), crate::error::AppError> {
-        let url = format!(
-            "https://www.google.com/maps/preview/entitylist/getlist?authuser=0&hl=en&gl=us&pb=!1m2!1s{}!2s0",
-            list_id
+        let token = self.sapisid_value().map(compute_mas_token).unwrap_or_else(|| "A".into());
+        let pb = format!(
+            "!1m4!1s{id}!2e1!3m1!1e1!2e2!3e2!4i500!6m3!1s{token}!7e81!28e2!18i3!16b1",
+            id = list_id, token = token
         );
+        let url = "https://www.google.com/maps/preview/entitylist/getlist";
         let response = self
             .client
-            .get(&url)
+            .get(url)
+            .query(&[("authuser", "0"), ("hl", "en"), ("gl", "us"), ("pb", &pb)])
             .headers(self.request_headers())
             .send()
             .await?;
