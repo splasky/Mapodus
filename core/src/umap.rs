@@ -3,4 +3,4 @@ pub mod login;
 pub mod upload;
 
 pub use auth::CookieAuth;
-pub use upload::UmapClient;
+pub use upload::{MapCreationResult, UmapClient};
