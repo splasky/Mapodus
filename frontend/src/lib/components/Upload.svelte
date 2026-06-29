@@ -1,7 +1,7 @@
 <script lang="ts">
   import { apiPost } from '../api';
 
-  let { onUpload, onGoogleImport }: { onUpload: () => void; onGoogleImport?: () => void } = $props();
+  let { onUpload, onGoogleImport, onPrev, onNext }: { onUpload: () => void; onGoogleImport?: () => void; onPrev?: () => void; onNext?: () => void } = $props();
   let error = $state('');
   let uploading = $state(false);
   let dragging = $state(false);
@@ -82,10 +82,15 @@
 
   {#if onGoogleImport}
     <div class="divider"><span>or</span></div>
-    <button class="alt-btn" onclick={onGoogleImport}>
+    <button class="google-btn" onclick={onGoogleImport}>
       Import directly from Google Maps
     </button>
   {/if}
+
+  <div class="nav-row">
+    <button class="nav-prev" onclick={onPrev}>Previous</button>
+    <button class="nav-next" onclick={onNext}>Next</button>
+  </div>
 </div>
 
 <style>
@@ -119,18 +124,19 @@
   .divider span {
     padding: 0 0.8rem;
   }
-  .alt-btn {
+  .google-btn {
     width: 100%;
-    padding: 0.7rem;
-    border: 1px solid #cbd5e1;
+    padding: 0.75rem;
+    border: none;
     border-radius: 0.5rem;
-    background: white;
+    background: #4285f4;
+    color: white;
     cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.2s;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 0.2s;
   }
-  .alt-btn:hover {
-    border-color: #2563eb;
-    color: #2563eb;
+  .google-btn:hover {
+    background: #3367d6;
   }
 </style>
