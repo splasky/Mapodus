@@ -50,3 +50,6 @@ uMap-login.txt
 
 # OAuth client secrets
 client_secret_*.json
+
+# Frontend build artifacts (hash changes every build)
+web/static/assets/*

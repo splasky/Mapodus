@@ -8,7 +8,6 @@ use umap_core::umap::CookieAuth;
 pub struct GoogleUser {
     pub name: Option<String>,
     pub email: Option<String>,
-    pub avatar_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
