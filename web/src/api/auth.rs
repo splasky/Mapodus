@@ -16,7 +16,6 @@ pub struct AuthStatus {
     logged_in: bool,
     name: Option<String>,
     email: Option<String>,
-    avatar_url: Option<String>,
 }
 
 pub async fn google_login(_session: Session) -> impl IntoResponse {
@@ -24,6 +23,8 @@ pub async fn google_login(_session: Session) -> impl IntoResponse {
         std::env::var("GOOGLE_CLIENT_ID").unwrap_or_else(|_| "dummy-client-id".into());
     let client_secret = std::env::var("GOOGLE_CLIENT_SECRET")
         .unwrap_or_else(|_| "dummy-client-secret".into());
+    let redirect_url =
+        std::env::var("REDIRECT_URL").unwrap_or_else(|_| "http://localhost:8900/api/auth/google/callback".into());
 
     let auth_url =
         AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".into()).expect("Invalid auth URL");
@@ -35,7 +36,7 @@ pub async fn google_login(_session: Session) -> impl IntoResponse {
         .set_auth_uri(auth_url)
         .set_token_uri(token_url)
         .set_redirect_uri(
-            RedirectUrl::new("http://localhost:8900/api/auth/google/callback".into())
+            RedirectUrl::new(redirect_url)
                 .expect("Invalid redirect URL"),
         );
 
@@ -60,7 +61,6 @@ pub struct CallbackParams {
 struct PeopleResponse {
     names: Option<Vec<NameEntry>>,
     email_addresses: Option<Vec<EmailEntry>>,
-    photos: Option<Vec<PhotoEntry>>,
 }
 
 #[derive(Deserialize)]
@@ -71,11 +71,6 @@ struct NameEntry {
 #[derive(Deserialize)]
 struct EmailEntry {
     value: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct PhotoEntry {
-    url: Option<String>,
 }
 
 pub async fn google_callback(
@@ -96,6 +91,8 @@ pub async fn google_callback(
         std::env::var("GOOGLE_CLIENT_ID").unwrap_or_else(|_| "dummy-client-id".into());
     let client_secret = std::env::var("GOOGLE_CLIENT_SECRET")
         .unwrap_or_else(|_| "dummy-client-secret".into());
+    let redirect_url =
+        std::env::var("REDIRECT_URL").unwrap_or_else(|_| "http://localhost:8900/api/auth/google/callback".into());
 
     let auth_url =
         AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".into()).expect("Invalid auth URL");
@@ -107,7 +104,7 @@ pub async fn google_callback(
         .set_auth_uri(auth_url)
         .set_token_uri(token_url)
         .set_redirect_uri(
-            RedirectUrl::new("http://localhost:8900/api/auth/google/callback".into())
+            RedirectUrl::new(redirect_url)
                 .expect("Invalid redirect URL"),
         );
 
@@ -131,7 +128,7 @@ pub async fn google_callback(
 
     let access_token = token.access_token().secret();
 
-    let people_url = "https://people.googleapis.com/v1/people/me?personFields=names,email_addresses,photos";
+    let people_url = "https://people.googleapis.com/v1/people/me?personFields=names,email_addresses";
     let people_response = http_client
         .get(people_url)
         .bearer_auth(access_token)
@@ -149,16 +146,11 @@ pub async fn google_callback(
                     .email_addresses
                     .and_then(|e| e.into_iter().next())
                     .and_then(|e| e.value);
-                let avatar_url = people
-                    .photos
-                    .and_then(|p| p.into_iter().next())
-                    .and_then(|p| p.url);
 
                 let mut app = AppSession::from_session(&session).await;
                 app.google_user = Some(crate::session::GoogleUser {
                     name,
                     email,
-                    avatar_url,
                 });
                 app.save_to_session(&session).await;
             }
@@ -177,6 +169,5 @@ pub async fn status(session: Session) -> impl IntoResponse {
         logged_in: app.google_user.is_some(),
         name: app.google_user.as_ref().and_then(|u| u.name.clone()),
         email: app.google_user.as_ref().and_then(|u| u.email.clone()),
-        avatar_url: app.google_user.as_ref().and_then(|u| u.avatar_url.clone()),
     })
 }

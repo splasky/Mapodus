@@ -7,7 +7,7 @@ pub mod umap;
 use axum::Router;
 
 pub fn routes() -> Router {
-    Router::new()
+    let mut router = Router::new()
         .route("/api/auth/google", axum::routing::get(auth::google_login))
         .route("/api/auth/google/callback", axum::routing::get(auth::google_callback))
         .route("/api/auth/status", axum::routing::get(auth::status))
@@ -17,6 +17,11 @@ pub fn routes() -> Router {
         .route("/api/umap/status", axum::routing::get(umap::status))
         .route("/api/transfer", axum::routing::post(umap::transfer))
         .route("/api/google/import", axum::routing::post(google_import::import))
-        .route("/api/google/confirm", axum::routing::post(google_import::confirm))
-        .route("/api/google/debug", axum::routing::post(google_import::debug_import))
+        .route("/api/google/confirm", axum::routing::post(google_import::confirm));
+
+    if std::env::var("DEV_MODE").as_deref() == Ok("true") {
+        router = router.route("/api/google/debug", axum::routing::post(google_import::debug_import));
+    }
+
+    router
 }

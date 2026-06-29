@@ -89,8 +89,8 @@ impl GoogleMapsClient {
         Some(format!("SAPISIDHASH {}_{}", timestamp, hash))
     }
 
-    /// Get all saved lists via the MAS endpoint.
-    pub async fn get_all_lists(&self) -> Result<Vec<GoogleSavedList>, crate::error::AppError> {
+    /// Fetch all saved lists via the MAS endpoint.
+    pub async fn fetch_saved_lists(&self) -> Result<Vec<GoogleSavedList>, crate::error::AppError> {
         let sapisid = self.sapisid_value().unwrap_or("A");
         let pb = build_mas_pb(sapisid);
         let url = "https://www.google.com/locationhistory/preview/mas";
@@ -145,8 +145,8 @@ impl GoogleMapsClient {
         Ok(lists)
     }
 
-    /// Get places for a specific list using its placelists page.
-    pub async fn get_list_places(
+    /// Fetch places for a specific saved list.
+    pub async fn fetch_list_places(
         &self,
         list_id: &str,
         list_name: &str,
@@ -238,7 +238,7 @@ impl GoogleMapsClient {
 
     /// High-level: get all places from all saved lists.
     pub async fn get_all_saved_places(&self) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
-        let lists = self.get_all_lists().await?;
+        let lists = self.fetch_saved_lists().await?;
         if lists.is_empty() {
             eprintln!("  No saved lists found (cookies may be expired).");
             return Ok(vec![]);
@@ -250,7 +250,7 @@ impl GoogleMapsClient {
         let mut all_places = Vec::new();
         for list in &lists {
             eprintln!("  Fetching places for '{}'...", list.name);
-            match self.get_list_places(&list.id, &list.name).await {
+            match self.fetch_list_places(&list.id, &list.name).await {
                 Ok(places) => {
                     eprintln!("    Got {} places", places.len());
                     all_places.extend(places);
