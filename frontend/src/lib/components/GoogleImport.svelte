@@ -8,6 +8,7 @@
   let lists = $state<Array<{name: string, count: number}>>([]);
   let selectedLists = $state<Set<string>>(new Set());
   let imported = $state(false);
+  let transferMode = $state<'single' | 'per_list'>('single');
 
   function parseCookies(s: string): Record<string, string> {
     const cookies: Record<string, string> = {};
@@ -50,6 +51,7 @@
     try {
       await apiPost('/google/confirm', {
         selected_lists: [...selectedLists],
+        transfer_mode: transferMode,
       });
       onImport();
     } catch (e) {
@@ -106,6 +108,18 @@
           <span class="list-count">{list.count} places</span>
         </div>
       {/each}
+    </div>
+
+    <div class="mode-select">
+      <p class="label-text">Transfer mode:</p>
+      <label>
+        <input type="radio" bind:group={transferMode} value="single" disabled={importing} />
+        All in one map
+      </label>
+      <label>
+        <input type="radio" bind:group={transferMode} value="per_list" disabled={importing} />
+        One map per list
+      </label>
     </div>
 
     <button onclick={handleConfirm} disabled={importing || selectedLists.size === 0}>
@@ -171,5 +185,24 @@
     color: #64748b;
     margin-bottom: 0.8rem;
     line-height: 1.5;
+  }
+  .mode-select {
+    margin: 1rem 0;
+    padding: 0.8rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+  }
+  .mode-select .label-text {
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  .mode-select label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-right: 1.2rem;
+    font-weight: 400;
+    cursor: pointer;
   }
 </style>
