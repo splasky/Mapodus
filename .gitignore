@@ -42,3 +42,10 @@ frontend/node_modules/
 # Agent session files
 session-ses_*.md
 google-*
+
+# Task notes / docs
+fix-*.md
+uMap-login.txt
+
+# OAuth client secrets
+client_secret_*.json

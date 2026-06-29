@@ -70,12 +70,16 @@ impl GoogleMapsClient {
         headers
     }
 
-    fn sapisid_hash(&self) -> Option<String> {
-        let sapisid = self
-            .cookies
+    fn sapisid_value(&self) -> Option<&str> {
+        self.cookies
             .get("SAPISID")
             .or_else(|| self.cookies.get("__Secure-3PAPISID"))
-            .or_else(|| self.cookies.get("__Secure-1PSAPISID"))?;
+            .or_else(|| self.cookies.get("__Secure-1PSAPISID"))
+            .map(|s| s.as_str())
+    }
+
+    fn sapisid_hash(&self) -> Option<String> {
+        let sapisid = self.sapisid_value()?;
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .ok()?
@@ -87,7 +91,8 @@ impl GoogleMapsClient {
 
     /// Get all saved lists via the MAS endpoint.
     pub async fn get_all_lists(&self) -> Result<Vec<GoogleSavedList>, crate::error::AppError> {
-        let pb = build_mas_pb();
+        let sapisid = self.sapisid_value().unwrap_or("A");
+        let pb = build_mas_pb(sapisid);
         let url = "https://www.google.com/locationhistory/preview/mas";
         let response = self
             .client
@@ -183,7 +188,8 @@ impl GoogleMapsClient {
 
     /// Debug: call the MAS endpoint and return the raw response text + status.
     pub async fn debug_mas(&self) -> Result<(u16, String), crate::error::AppError> {
-        let pb = build_mas_pb();
+        let sapisid = self.sapisid_value().unwrap_or("A");
+        let pb = build_mas_pb(sapisid);
         let url = "https://www.google.com/locationhistory/preview/mas";
         let response = self
             .client
@@ -283,23 +289,75 @@ impl ProtoTextWriter {
         self.token_count += 1 + child_tokens;
     }
 
+    fn write_double(&mut self, field: u32, value: f64) {
+        self.buf.push_str(&format!("!{}d{}", field, value));
+        self.token_count += 1;
+    }
+
+    fn write_float(&mut self, field: u32, value: f32) {
+        self.buf.push_str(&format!("!{}f{}", field, value));
+        self.token_count += 1;
+    }
+
+    fn write_bool(&mut self, field: u32, value: bool) {
+        self.buf.push_str(&format!("!{}b{}", field, value as u8));
+        self.token_count += 1;
+    }
+
     fn into_string(self) -> String {
         self.buf
     }
 }
 
-/// Write a message field with its token count prefix.
-/// The format is `!{field}m{token_count_of_children}{children_encoded}`.
-/// token_count includes all descendants.
+/// Compute the session token for the MAS pb parameter.
+/// In the reference curl, this is the first field inside the auth message,
+/// appearing as e.g. `!1sabRAarDgD4uu2roPmN6v2Ak`. The value is
+/// base64url(MD5(SAPISID)).
+fn compute_mas_token(sapisid: &str) -> String {
+    let hash = md5(sapisid.as_bytes());
+    base64url_encode(&hash)
+}
+
+fn base64url_encode(input: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut result = String::new();
+    let mut i = 0;
+    while i + 3 <= input.len() {
+        let b0 = input[i] as u32;
+        let b1 = input[i + 1] as u32;
+        let b2 = input[i + 2] as u32;
+        let combined = (b0 << 16) | (b1 << 8) | b2;
+        result.push(ALPHABET[((combined >> 18) & 0x3f) as usize] as char);
+        result.push(ALPHABET[((combined >> 12) & 0x3f) as usize] as char);
+        result.push(ALPHABET[((combined >> 6) & 0x3f) as usize] as char);
+        result.push(ALPHABET[(combined & 0x3f) as usize] as char);
+        i += 3;
+    }
+    let remaining = input.len() - i;
+    if remaining == 1 {
+        let b0 = input[i] as u32;
+        result.push(ALPHABET[((b0 >> 2) & 0x3f) as usize] as char);
+        result.push(ALPHABET[((b0 << 4) & 0x3f) as usize] as char);
+    } else if remaining == 2 {
+        let b0 = input[i] as u32;
+        let b1 = input[i + 1] as u32;
+        let combined = (b0 << 8) | b1;
+        result.push(ALPHABET[((combined >> 10) & 0x3f) as usize] as char);
+        result.push(ALPHABET[((combined >> 4) & 0x3f) as usize] as char);
+        result.push(ALPHABET[((combined << 2) & 0x3f) as usize] as char);
+    }
+    result
+}
+
 /// Build the pb parameter for the MAS endpoint.
-fn build_mas_pb() -> String {
-    // Minimal known-working format from real curl request:
-    // !2m3!1s{token}!7e81!15i20393!7m1!1i50!9m0!12m1!1i50!15m1!1i50
+/// `sapisid` is used to compute the session token needed in the request.
+fn build_mas_pb(sapisid: &str) -> String {
+    let token = compute_mas_token(sapisid);
     let mut w = ProtoTextWriter::new();
 
     // Field 2: message with auth/version info
     let mut inner = ProtoTextWriter::new();
-    inner.write_string(1, "A");
+    inner.write_string(1, &token);
     inner.write_enum(7, 81);
     inner.write_int(15, 20393);
     let inner_str = inner.into_string();
@@ -325,6 +383,33 @@ fn build_mas_pb() -> String {
     f15.write_int(1, 50);
     let f15_str = f15.into_string();
     w.write_message(15, &format!("{}{}", 1, f15_str), 1);
+
+    // Field 17: empty viewport (matches working curl format)
+    w.write_message(17, "0", 0);
+
+    // Field 18: map viewport / zoom (same format as working curl)
+    let mut f18 = ProtoTextWriter::new();
+    let mut center = ProtoTextWriter::new();
+    center.write_double(1, 34667.92215241253);
+    center.write_double(2, 120.651776);
+    center.write_double(3, 24.1271641);
+    f18.write_message(1, &format!("{}{}", 3, center.into_string()), 3);
+    f18.write_message(2, "0", 0);
+    let mut dims = ProtoTextWriter::new();
+    dims.write_int(1, 634);
+    dims.write_int(2, 914);
+    f18.write_message(3, &format!("{}{}", 2, dims.into_string()), 2);
+    f18.write_float(4, 13.1);
+    w.write_message(18, &format!("{}{}", 9, f18.into_string()), 9);
+
+    // Fields 23, 24, 38: option flags (int 50, bool true)
+    let mut flag = ProtoTextWriter::new();
+    flag.write_int(1, 50);
+    flag.write_bool(3, true);
+    let flag_str = flag.into_string();
+    w.write_message(23, &format!("{}{}", 2, flag_str), 2);
+    w.write_message(24, &format!("{}{}", 2, flag_str), 2);
+    w.write_message(38, &format!("{}{}", 2, flag_str), 2);
 
     w.into_string()
 }

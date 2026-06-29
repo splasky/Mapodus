@@ -2,20 +2,31 @@
   import { apiPost } from '../api';
 
   let { onImport, onPrev, onNext }: { onImport: () => void; onPrev?: () => void; onNext?: () => void } = $props();
-  let sapisid = $state('');
-  let sid = $state('');
-  let hsid = $state('');
+  let cookieString = $state('');
   let error = $state('');
   let importing = $state(false);
   let lists = $state<Array<{name: string, count: number}>>([]);
   let selectedLists = $state<Set<string>>(new Set());
   let imported = $state(false);
 
+  function parseCookies(s: string): Record<string, string> {
+    const cookies: Record<string, string> = {};
+    for (const pair of s.split(';')) {
+      const eq = pair.indexOf('=');
+      if (eq === -1) continue;
+      const key = pair.slice(0, eq).trim();
+      const val = pair.slice(eq + 1).trim();
+      if (key && val) cookies[key] = val;
+    }
+    return cookies;
+  }
+
   async function handleImport() {
     importing = true;
     error = '';
     try {
-      const data = await apiPost<any>('/google/import', { cookies: { SAPISID: sapisid, SID: sid, HSID: hsid } });
+      const cookies = parseCookies(cookieString);
+      const data = await apiPost<any>('/google/import', { cookies });
       lists = data.lists;
       selectedLists = new Set(data.lists.map((l: any) => l.name));
       imported = true;
@@ -52,27 +63,19 @@
 <div class="card">
   {#if !imported}
     <h2>Import from Google Maps</h2>
-    <p>Enter your Google Maps cookies below. Cookies expire after a few hours — collect fresh ones before each import.</p>
-    <p class="hint">Open DevTools (<kbd>F12</kbd>) → Application → Cookies → <code>https://www.google.com</code>. Find each cookie and copy its <strong>Value</strong> column (not the entire line).</p>
+    <p>Paste your Google cookies below. Cookies expire after a few hours — collect fresh ones before each import.</p>
+    <p class="hint">Open DevTools (<kbd>F12</kbd>) → Application → Cookies → <code>https://www.google.com</code>. Right-click any cookie → <strong>Copy All</strong>, or copy the <code>-b</code> argument from a cURL command. Paste the raw cookie string here.</p>
 
     {#if error}
       <div class="notice error">{error}</div>
     {/if}
 
     <label>
-      <span class="label-text">SAPISID (or <code>__Secure-1PSAPISID</code>)</span>
-      <input bind:value={sapisid} placeholder="e.g. PNrvbi35JksfBlsY/..." disabled={importing} />
-    </label>
-    <label>
-      <span class="label-text">SID (or <code>__Secure-1PSID</code>)</span>
-      <input bind:value={sid} placeholder="e.g. g.a000_ghMcaykDfbAO5EpWYL..." disabled={importing} />
-    </label>
-    <label>
-      <span class="label-text">HSID</span>
-      <input bind:value={hsid} placeholder="e.g. A_njHR6H-WOCweJnB" disabled={importing} />
+      <span class="label-text">Cookie string (semicolon-separated <code>key=value</code> pairs)</span>
+      <textarea bind:value={cookieString} placeholder="SAPISID=...; SID=...; HSID=...; __Secure-1PSIDTS=...; ..." disabled={importing} rows={4}></textarea>
     </label>
 
-    <button onclick={handleImport} disabled={importing || !sapisid || !sid || !hsid}>
+    <button onclick={handleImport} disabled={importing || !cookieString.trim()}>
       {importing ? 'Fetching lists...' : 'Fetch My Saved Lists'}
     </button>
   {:else}
