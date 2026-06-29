@@ -146,6 +146,7 @@ pub struct ImportResponse {
 #[derive(Deserialize)]
 pub struct ConfirmRequest {
     selected_lists: Vec<String>,
+    transfer_mode: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -237,6 +238,7 @@ pub async fn confirm(
 
     let count = bookmarks.len();
     app.bookmarks = Some(bookmarks);
+    app.transfer_mode = Some(req.transfer_mode.unwrap_or_else(|| "single".into()));
     app.selected_ids = None;
     app.save_to_session(&session).await;
 

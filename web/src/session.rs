@@ -19,6 +19,7 @@ pub struct AppSession {
     pub umap_auth: Option<CookieAuth>,
     pub umap_url: Option<String>,
     pub google_places: Option<Vec<GoogleSavedPlace>>,
+    pub transfer_mode: Option<String>,
 }
 
 impl AppSession {
