@@ -10,6 +10,12 @@ fn layer_id_to_string(id: Option<&serde_json::Value>) -> Option<String> {
     })
 }
 
+#[derive(Debug, Clone)]
+pub struct MapCreationResult {
+    pub id: String,
+    pub slug: String,
+}
+
 #[derive(Debug)]
 pub struct UmapClient {
     base_url: String,
@@ -70,7 +76,7 @@ impl UmapClient {
         name: &str,
         fc: &geojson::FeatureCollection,
         auth: &CookieAuth,
-    ) -> Result<String> {
+    ) -> Result<MapCreationResult> {
         let create_url = format!("{}/map/create/", self.base_url);
 
         let (lon, lat) = Self::compute_center(fc).unwrap_or((0.0, 0.0));
@@ -119,6 +125,19 @@ impl UmapClient {
             .and_then(|v| v.as_u64())
             .ok_or_else(|| anyhow::anyhow!("No map id in create response: {}", json_text))?;
 
+        let slug = map_data
+            .get("slug")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                name.to_lowercase()
+                    .chars()
+                    .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+                    .collect::<String>()
+                    .trim_matches('-')
+                    .to_string()
+            });
+
         let owner_id = map_data
             .get("permissions")
             .and_then(|p| p.get("owner"))
@@ -133,7 +152,10 @@ impl UmapClient {
             println!("Warning: Failed to set map permissions: {}", e);
         }
 
-        Ok(map_id.to_string())
+        Ok(MapCreationResult {
+            id: map_id.to_string(),
+            slug,
+        })
     }
 
     pub async fn set_map_permissions(

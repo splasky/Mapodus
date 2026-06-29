@@ -92,7 +92,7 @@ pub async fn transfer(
     let fc = Converter::to_umap_geojson(&selected);
     let client = UmapClient::new(&umap_url);
 
-    let map_id = client
+    let result = client
         .create_map(
             &format!("Google Maps Saved ({})", chrono::Local::now().format("%Y-%m-%d")),
             &fc,
@@ -103,15 +103,15 @@ pub async fn transfer(
 
     let layer_name = "Google Maps Saved";
     client
-        .create_and_upload_layer(&map_id, layer_name, &fc, &auth)
+        .create_and_upload_layer(&result.id, layer_name, &fc, &auth)
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to upload: {}", e)))?;
 
-    let map_url = format!("{}/map/{}", umap_url.trim_end_matches('/'), map_id);
+    let map_url = format!("{}/map/{}_{}", umap_url.trim_end_matches('/'), result.slug, result.id);
 
     Ok(Json(TransferResponse {
         success: true,
-        map_id,
+        map_id: result.id,
         map_url,
         message: "Map created and bookmarks uploaded".into(),
     }))

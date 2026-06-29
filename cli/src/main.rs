@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("umap-cookie required for --create-map"))?;
         let client = umap_core::umap::UmapClient::new(&args.umap_url);
-        map_id = client.create_map(new_map_name, &feature_collection, auth).await?;
+        map_id = client.create_map(new_map_name, &feature_collection, auth).await?.id;
     } else if let Some(existing_id) = &args.umap_map_id {
         map_id = existing_id.clone();
     } else {
