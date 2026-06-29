@@ -39,6 +39,24 @@
     umapConnected = false;
     bookmarksUploaded = false;
   }
+
+  function goPrev() {
+    switch (step) {
+      case 'upload': case 'google-import': step = 'login'; break;
+      case 'bookmarks': step = 'upload'; break;
+      case 'connect': step = 'bookmarks'; break;
+      case 'transfer': step = 'connect'; break;
+    }
+  }
+  function goNext() {
+    switch (step) {
+      case 'login': step = 'upload'; break;
+      case 'upload': step = 'bookmarks'; break;
+      case 'google-import': step = 'bookmarks'; break;
+      case 'bookmarks': step = 'connect'; break;
+      case 'connect': step = 'transfer'; break;
+    }
+  }
 </script>
 
 <div class="layout">
@@ -54,7 +72,7 @@
     <div class="step {step === 'upload' || step === 'google-import' ? 'active' : ''} {bookmarksUploaded ? 'done' : ''}">
       <span class="step-num">2</span> Import
     </div>
-    <div class="step {step === 'bookmarks' ? 'active' : ''}">
+    <div class="step {step === 'bookmarks' ? 'active' : ''} {bookmarksUploaded ? 'done' : ''}">
       <span class="step-num">3</span> Select Bookmarks
     </div>
     <div class="step {step === 'connect' ? 'active' : ''} {umapConnected ? 'done' : ''}">
@@ -66,17 +84,17 @@
   </div>
 
   {#if step === 'login'}
-    <Login onLogin={onLogin} />
+    <Login {onLogin} onNext={goNext} />
   {:else if step === 'upload'}
-    <Upload {onUpload} {onGoogleImport} />
+    <Upload {onUpload} {onGoogleImport} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'google-import'}
-    <GoogleImport onImport={onImportDone} />
+    <GoogleImport onImport={onImportDone} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'bookmarks'}
-    <Bookmarks onSelect={onSelect} />
+    <Bookmarks onSelect={onSelect} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'connect'}
-    <ConnectUmap onConnect={onConnect} />
+    <ConnectUmap onConnect={onConnect} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'transfer'}
-    <Transfer onDone={onDone} />
+    <Transfer onDone={onDone} onPrev={goPrev} />
   {/if}
 </div>
 
@@ -115,5 +133,45 @@
     background: rgba(0,0,0,0.1);
     font-size: 0.75rem;
     font-weight: bold;
+  }
+
+  :global(.nav-row) {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+    gap: 0.5rem;
+  }
+  :global(.nav-prev), :global(.nav-next) {
+    padding: 0.5rem 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.4rem;
+    background: white;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #475569;
+    transition: all 0.15s;
+  }
+  :global(.nav-prev:hover), :global(.nav-next:hover) {
+    border-color: #2563eb;
+    color: #2563eb;
+  }
+  :global(button.primary) {
+    width: 100%;
+    padding: 0.7rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  :global(button.primary:hover) {
+    background: #1d4ed8;
+  }
+  :global(button.primary:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>
