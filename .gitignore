@@ -56,3 +56,4 @@ web/static/assets/*
 
 # opencode config
 opencode.json
+.opencode/
