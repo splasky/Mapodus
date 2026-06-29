@@ -2,7 +2,9 @@
   import { apiPost } from '../api';
 
   let { onImport, onPrev, onNext }: { onImport: () => void; onPrev?: () => void; onNext?: () => void } = $props();
-  let cookies = $state('');
+  let sapisid = $state('');
+  let sid = $state('');
+  let hsid = $state('');
   let error = $state('');
   let importing = $state(false);
   let lists = $state<Array<{name: string, count: number}>>([]);
@@ -10,16 +12,10 @@
   let imported = $state(false);
 
   async function handleImport() {
-    if (!cookies.trim()) {
-      error = 'Please paste your Google Maps cookies';
-      return;
-    }
-
     importing = true;
     error = '';
     try {
-      const parsed = parseCookies(cookies);
-      const data = await apiPost<any>('/google/import', { cookies: parsed });
+      const data = await apiPost<any>('/google/import', { cookies: { SAPISID: sapisid, SID: sid, HSID: hsid } });
       lists = data.lists;
       selectedLists = new Set(data.lists.map((l: any) => l.name));
       imported = true;
@@ -51,40 +47,33 @@
       importing = false;
     }
   }
-
-  function parseCookies(text: string): Record<string, string> {
-    const result: Record<string, string> = {};
-    for (const part of text.split(';')) {
-      const eq = part.indexOf('=');
-      if (eq > 0) {
-        const key = part.substring(0, eq).trim();
-        const val = part.substring(eq + 1).trim();
-        if (key && val) result[key] = val;
-      }
-    }
-    return result;
-  }
 </script>
 
 <div class="card">
   {#if !imported}
     <h2>Import from Google Maps</h2>
-    <p>Paste your Google Maps cookies below. You need <strong>SAPISID</strong> (or <strong>__Secure-1PSAPISID</strong>), <strong>SID</strong>, and <strong>HSID</strong> cookies.</p>
-    <p class="hint">Open your browser's DevTools → Application → Cookies → <code>https://www.google.com</code>, copy all cookies as text.</p>
+    <p>Enter your Google Maps cookies below. Cookies expire after a few hours — collect fresh ones before each import.</p>
+    <p class="hint">Open DevTools (<kbd>F12</kbd>) → Application → Cookies → <code>https://www.google.com</code>. Find each cookie and copy its <strong>Value</strong> column (not the entire line).</p>
 
     {#if error}
       <div class="notice error">{error}</div>
     {/if}
 
-    <textarea
-      bind:value={cookies}
-      placeholder="SAPISID=...; SID=...; HSID=..."
-      rows={6}
-      disabled={importing}
-    ></textarea>
+    <label>
+      <span class="label-text">SAPISID (or <code>__Secure-1PSAPISID</code>)</span>
+      <input bind:value={sapisid} placeholder="e.g. PNrvbi35JksfBlsY/..." disabled={importing} />
+    </label>
+    <label>
+      <span class="label-text">SID (or <code>__Secure-1PSID</code>)</span>
+      <input bind:value={sid} placeholder="e.g. g.a000_ghMcaykDfbAO5EpWYL..." disabled={importing} />
+    </label>
+    <label>
+      <span class="label-text">HSID</span>
+      <input bind:value={hsid} placeholder="e.g. A_njHR6H-WOCweJnB" disabled={importing} />
+    </label>
 
-    <button onclick={handleImport} disabled={importing || !cookies.trim()}>
-      {importing ? 'Importing...' : 'Import'}
+    <button onclick={handleImport} disabled={importing || !sapisid || !sid || !hsid}>
+      {importing ? 'Fetching lists...' : 'Fetch My Saved Lists'}
     </button>
   {:else}
     <h2>Select Lists to Import</h2>
@@ -128,14 +117,27 @@
 </div>
 
 <style>
-  textarea {
+  label {
+    display: grid;
+    gap: 0.3rem;
+    margin-bottom: 0.8rem;
+  }
+  .label-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+  }
+  .label-text code {
+    font-weight: 400;
+    color: #64748b;
+  }
+  input {
     width: 100%;
     padding: 0.6rem;
     border: 1px solid #cbd5e1;
     border-radius: 0.5rem;
     font-family: monospace;
     font-size: 0.8rem;
-    margin-bottom: 1rem;
     box-sizing: border-box;
   }
   .list-group {
@@ -165,5 +167,6 @@
     font-size: 0.85rem;
     color: #64748b;
     margin-bottom: 0.8rem;
+    line-height: 1.5;
   }
 </style>
