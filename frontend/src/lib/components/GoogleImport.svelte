@@ -1,7 +1,7 @@
 <script lang="ts">
   import { apiPost } from '../api';
 
-  let { onImport }: { onImport: () => void } = $props();
+  let { onImport, onPrev, onNext }: { onImport: () => void; onPrev?: () => void; onNext?: () => void } = $props();
   let cookies = $state('');
   let error = $state('');
   let importing = $state(false);
@@ -120,6 +120,11 @@
       {importing ? 'Saving...' : 'Import Selected to uMap'}
     </button>
   {/if}
+
+  <div class="nav-row">
+    <button class="nav-prev" onclick={onPrev}>Previous</button>
+    <button class="nav-next" onclick={onNext}>Next</button>
+  </div>
 </div>
 
 <style>

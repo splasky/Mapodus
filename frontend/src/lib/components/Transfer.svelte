@@ -1,7 +1,7 @@
 <script lang="ts">
   import { apiPost } from '../api';
 
-  let { onDone }: { onDone: () => void } = $props();
+  let { onDone, onPrev }: { onDone: () => void; onPrev?: () => void } = $props();
   let transferring = $state(false);
   let error = $state('');
   let result = $state<{ map_id?: string; map_url?: string } | null>(null);
@@ -53,4 +53,9 @@
   {:else}
     <p>Starting transfer...</p>
   {/if}
+
+  <div class="nav-row">
+    <button class="nav-prev" onclick={onPrev}>Previous</button>
+    <span></span>
+  </div>
 </div>
