@@ -18,17 +18,8 @@ pub struct DebugRequest {
 
 #[derive(Serialize)]
 pub struct DebugResponse {
-    mas_status: u16,
-    mas_raw: String,
-    mas_parsed_lists: serde_json::Value,
-    list_debug: Option<ListDebugInfo>,
-}
-
-#[derive(Serialize)]
-pub struct ListDebugInfo {
-    list_status: u16,
-    list_raw: String,
-    list_parsed_places: serde_json::Value,
+    lists: serde_json::Value,
+    list_places: Option<serde_json::Value>,
 }
 
 pub async fn debug_import(
@@ -36,92 +27,24 @@ pub async fn debug_import(
 ) -> Result<impl IntoResponse, ApiError> {
     let client = GoogleMapsClient::new(req.cookies);
 
-    let (mas_status, mas_raw) = client
-        .debug_mas()
+    let lists = client
+        .fetch_saved_lists()
         .await
-        .map_err(|e| ApiError::Internal(format!("MAS debug error: {}", e)))?;
+        .map_err(|e| ApiError::Internal(format!("MAS error: {}", e)))?;
 
-    // Try to parse the MAS response to show what structures were found
-    let mas_parsed = if mas_status == 200 {
-        let body = umap_core::google_maps_api::strip_xssi(&mas_raw)
-            .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
-            .unwrap_or(serde_json::Value::Null);
-        let root = body.as_array().cloned().unwrap_or_default();
-
-        // Show all top-level elements that are arrays (potential list containers)
-        let candidates: Vec<serde_json::Value> = root
-            .iter()
-            .enumerate()
-            .filter(|(_, v)| v.is_array())
-            .map(|(i, v)| {
-                let arr = v.as_array().unwrap();
-                let info = if arr.len() >= 4
-                    && arr[0].is_null()
-                    && arr[1].is_null()
-                    && arr[2].is_null()
-                {
-                    format!("[null,null,null,...] {} entries in inner array",
-                        arr[3].as_array().map(|a| a.len()).unwrap_or(0))
-                } else {
-                    format!("array of length {}", arr.len())
-                };
-                serde_json::json!({"index": i, "info": info})
-            })
-            .collect();
-
-        serde_json::json!({
-            "array_count": root.len(),
-            "array_candidates": candidates,
-            "top_level_types": root.iter().enumerate().map(|(i, v)| {
-                serde_json::json!({"index": i, "type": match v {
-                    serde_json::Value::Null => "null",
-                    serde_json::Value::Array(_) => "array",
-                    _ => "other",
-                }})
-            }).collect::<Vec<_>>(),
-        })
-    } else {
-        serde_json::Value::Null
-    };
-
-    let list_debug = if let Some(list_id) = req.list_id {
-        let (list_status, list_raw) = client
-            .debug_getlist(&list_id)
+    let list_places = if let Some(list_id) = req.list_id {
+        let places = client
+            .fetch_list_places(&list_id, "debug")
             .await
-            .map_err(|e| ApiError::Internal(format!("getlist debug error: {}", e)))?;
-
-        let list_parsed = if list_status == 200 {
-            let body = umap_core::google_maps_api::strip_xssi(&list_raw)
-                .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
-                .unwrap_or(serde_json::Value::Null);
-            let root = body.as_array().and_then(|a| a.first()).and_then(|v| v.as_array());
-            let entries = root.and_then(|r| r.get(8).and_then(|v| v.as_array()));
-            serde_json::json!({
-                "root_is_array": body.is_array(),
-                "root_len": body.as_array().map(|a| a.len()),
-                "first_elem_is_array": body.as_array().and_then(|a| a.first()).map(|v| v.is_array()),
-                "first_elem_len": root.map(|r| r.len()),
-                "entries_at_8": entries.map(|e| e.len()),
-                "raw_first_500": &list_raw[..list_raw.len().min(500)],
-            })
-        } else {
-            serde_json::Value::Null
-        };
-
-        Some(ListDebugInfo {
-            list_status,
-            list_raw: list_raw.clone(),
-            list_parsed_places: list_parsed,
-        })
+            .map_err(|e| ApiError::Internal(format!("getlist error: {}", e)))?;
+        Some(serde_json::to_value(places).unwrap_or_default())
     } else {
         None
     };
 
     Ok(Json(DebugResponse {
-        mas_status,
-        mas_raw: mas_raw.clone(),
-        mas_parsed_lists: mas_parsed,
-        list_debug,
+        lists: serde_json::to_value(lists).unwrap_or_default(),
+        list_places,
     }))
 }
 

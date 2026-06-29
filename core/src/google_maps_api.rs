@@ -194,48 +194,6 @@ impl GoogleMapsClient {
         Ok(places)
     }
 
-    /// Debug: call the MAS endpoint and return the raw response text + status.
-    pub async fn debug_mas(&self) -> Result<(u16, String), crate::error::AppError> {
-        let sapisid = self.sapisid_value().unwrap_or("A");
-        let pb = build_mas_pb(sapisid);
-        let url = "https://www.google.com/locationhistory/preview/mas";
-        let response = self
-            .client
-            .get(url)
-            .query(&[("authuser", "0"), ("hl", "en"), ("gl", "us"), ("pb", &pb)])
-            .headers(self.request_headers())
-            .send()
-            .await?;
-        let status = response.status().as_u16();
-        let data = response.bytes().await?;
-        let body = String::from_utf8_lossy(&data).to_string();
-        Ok((status, body))
-    }
-
-    /// Debug: call the entitylist/getlist endpoint and return raw response.
-    pub async fn debug_getlist(
-        &self,
-        list_id: &str,
-    ) -> Result<(u16, String), crate::error::AppError> {
-        let token = self.sapisid_value().map(compute_mas_token).unwrap_or_else(|| "A".into());
-        let pb = format!(
-            "!1m4!1s{id}!2e1!3m1!1e1!2e2!3e2!4i500!6m3!1s{token}!7e81!28e2!18i3!16b1",
-            id = list_id, token = token
-        );
-        let url = "https://www.google.com/maps/preview/entitylist/getlist";
-        let response = self
-            .client
-            .get(url)
-            .query(&[("authuser", "0"), ("hl", "en"), ("gl", "us"), ("pb", &pb)])
-            .headers(self.request_headers())
-            .send()
-            .await?;
-        let status = response.status().as_u16();
-        let data = response.bytes().await?;
-        let body = String::from_utf8_lossy(&data).to_string();
-        Ok((status, body))
-    }
-
     /// High-level: get all places from all saved lists.
     pub async fn get_all_saved_places(&self) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
         let lists = self.fetch_saved_lists().await?;
