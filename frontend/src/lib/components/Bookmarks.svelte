@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { apiGet } from '../api';
+  import { apiGet, apiPost } from '../api';
 
   let { onSelect, onPrev, onNext }: { onSelect: () => void; onPrev?: () => void; onNext?: () => void } = $props();
   let bookmarks = $state<any[]>([]);
   let selected = $state<Set<number>>(new Set());
   let loading = $state(true);
+  let transferring = $state(false);
   let error = $state('');
 
   async function load() {
@@ -39,13 +40,17 @@
   }
 
   async function proceed() {
-    // Store selection in session
-    await fetch('/api/transfer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ selected_ids: [...selected] }),
-    }).catch(() => {});
-    onSelect();
+    transferring = true;
+    error = '';
+    try {
+      await apiPost('/bookmarks/auto_enrich').catch(() => {});
+      await apiPost('/bookmarks/select', { selected_ids: [...selected] }).catch(() => {});
+      onSelect();
+    } catch (e) {
+      error = String(e);
+    } finally {
+      transferring = false;
+    }
   }
 
   $effect(() => { load(); });
@@ -80,12 +85,61 @@
           {:else}
             <span class="bk-no-coords" title="Missing coordinates">⚠️</span>
           {/if}
-        </div>
+</div>
+
+<style>
+  .spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .bookmark-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+  }
+  .bookmark-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .bookmark-row:last-child {
+    border-bottom: none;
+  }
+  .bk-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bk-has-coords {
+    font-size: 0.85rem;
+  }
+  .bk-no-coords {
+    font-size: 0.85rem;
+  }
+</style>
       {/each}
     </div>
 
-    <button class="primary" onclick={proceed} disabled={selected.size === 0}>
-      Transfer {selected.size} bookmarks to uMap
+    <button class="primary" onclick={proceed} disabled={selected.size === 0 || transferring}>
+      {#if transferring}
+        <span class="spinner"></span> Enriching & transferring...
+      {:else}
+        Transfer {selected.size} bookmarks to uMap
+      {/if}
     </button>
   {/if}
 
