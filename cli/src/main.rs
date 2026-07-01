@@ -96,7 +96,10 @@ mod tests {
         let places = google::parse_takeout(&path).unwrap();
         assert_eq!(places.len(), 4);
         let first = &places[0];
-        assert_eq!(first.title.as_deref(), Some("6owl door Hsinchu Dongnan Branch"));
+        assert_eq!(
+            first.title.as_deref(),
+            Some("6owl door Hsinchu Dongnan Branch")
+        );
         assert!(
             first
                 .url
