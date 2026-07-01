@@ -8,6 +8,7 @@ use serde_json;
 ///   - `https://maps.google.com/?q=lat,lng`
 ///   - `https://www.google.com/maps/place/Name/@lat,lng,zoom`
 ///   - `https://www.google.com/maps/place/?q=place_id:XYZ` (no coords)
+///   - `https://www.google.com/maps/search/lat,lng`
 pub fn extract_coords_from_url(url: &str) -> Option<(f64, f64)> {
     // Pattern: @lat,lng or @lat,lng,zoom in the path
     if let Some(at_pos) = url.find('@') {
@@ -17,6 +18,23 @@ pub fn extract_coords_from_url(url: &str) -> Option<(f64, f64)> {
             .unwrap_or(after_at.len());
         let coords = &after_at[..end];
         let parts: Vec<&str> = coords.split(',').collect();
+        if parts.len() >= 2 {
+            let lat = parts[0].parse::<f64>().ok()?;
+            let lng = parts[1].parse::<f64>().ok()?;
+            if lat.is_finite() && lng.is_finite() {
+                return Some((lat, lng));
+            }
+        }
+    }
+
+    // Pattern: /search/lat,lng in path
+    if let Some(search_pos) = url.find("/search/") {
+        let after = &url[search_pos + 8..];
+        let end = after
+            .find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-' && c != ',')
+            .unwrap_or(after.len());
+        let value = &after[..end];
+        let parts: Vec<&str> = value.split(',').collect();
         if parts.len() >= 2 {
             let lat = parts[0].parse::<f64>().ok()?;
             let lng = parts[1].parse::<f64>().ok()?;
@@ -50,7 +68,9 @@ pub fn extract_coords_from_url(url: &str) -> Option<(f64, f64)> {
 }
 
 /// Extract a Google Maps place ID from a URL.
-/// Format: `https://www.google.com/maps/place/?q=place_id:ChIJ...`
+/// Handles formats:
+///   - `?q=place_id:ChIJ...`
+///   - `/data=!4m2!3m1!1sChIJ...` (Google Takeout protobuf format)
 pub fn extract_place_id_from_url(url: &str) -> Option<String> {
     // Pattern: place_id:XYZ in query string
     if let Some(q_pos) = url.find("place_id:") {
@@ -63,6 +83,20 @@ pub fn extract_place_id_from_url(url: &str) -> Option<String> {
             return Some(id.to_string());
         }
     }
+
+    // Pattern: !1sPLACE_ID in protobuf-encoded data parameter
+    // e.g. /data=!4m2!3m1!1s0x346835e9aa147b0b:0x8e09cb932ab96f34
+    if let Some(s_pos) = url.find("!1s") {
+        let after = &url[s_pos + 3..];
+        let end = after
+            .find(|c: char| ['!', '&', '#'].contains(&c))
+            .unwrap_or(after.len());
+        let id = &after[..end];
+        if !id.is_empty() {
+            return Some(id.to_string());
+        }
+    }
+
     None
 }
 
@@ -297,5 +331,192 @@ pub fn parse_takeout(path: &str) -> Result<Vec<GooglePlace>> {
         _ => Err(anyhow!(
             "Unsupported file format. Expected .csv, .json, or .geojson"
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── extract_place_id_from_url tests ──
+
+    #[test]
+    fn test_extract_place_id_from_url_place_id_query() {
+        let url = "https://www.google.com/maps/place/?q=place_id:ChIJN1t_tDeuEmsRUsoyG83frY4";
+        assert_eq!(
+            extract_place_id_from_url(url),
+            Some("ChIJN1t_tDeuEmsRUsoyG83frY4".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_place_id_from_url_1s_fmt() {
+        let url = "https://www.google.com/maps/place/6owl+door+Hsinchu+Dongnan+Branch/data=!4m2!3m1!1s0x346835e9aa147b0b:0x8e09cb932ab96f34";
+        assert_eq!(
+            extract_place_id_from_url(url),
+            Some("0x346835e9aa147b0b:0x8e09cb932ab96f34".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_place_id_from_url_no_place_id() {
+        let url = "https://www.google.com/maps/search/24.8583332,120.9927297";
+        assert_eq!(extract_place_id_from_url(url), None);
+    }
+
+    #[test]
+    fn test_extract_place_id_from_url_empty() {
+        assert_eq!(extract_place_id_from_url(""), None);
+    }
+
+    // ── extract_coords_from_url tests ──
+
+    #[test]
+    fn test_extract_coords_from_url_at_fmt() {
+        let url = "https://www.google.com/maps/place/Name/@24.7994433,120.9730098,17z";
+        assert_eq!(
+            extract_coords_from_url(url),
+            Some((24.7994433, 120.9730098))
+        );
+    }
+
+    #[test]
+    fn test_extract_coords_from_url_search_fmt() {
+        let url = "https://www.google.com/maps/search/24.8583332,120.9927297";
+        assert_eq!(
+            extract_coords_from_url(url),
+            Some((24.8583332, 120.9927297))
+        );
+    }
+
+    #[test]
+    fn test_extract_coords_from_url_q_fmt() {
+        let url = "https://maps.google.com/?q=25.033,121.565";
+        assert_eq!(extract_coords_from_url(url), Some((25.033, 121.565)));
+    }
+
+    #[test]
+    fn test_extract_coords_from_url_place_id_ignored() {
+        let url = "https://www.google.com/maps/place/?q=place_id:ChIJN1t_tDeuEmsRUsoyG83frY4";
+        assert_eq!(extract_coords_from_url(url), None);
+    }
+
+    #[test]
+    fn test_extract_coords_from_url_no_coords() {
+        let url = "https://www.google.com/maps/place/SomePlace/data=!4m2!3m1!1sabc123";
+        assert_eq!(extract_coords_from_url(url), None);
+    }
+
+    #[test]
+    fn test_extract_coords_from_url_empty() {
+        assert_eq!(extract_coords_from_url(""), None);
+    }
+
+    // ── from_csv_record enrichment tests ──
+
+    /// Parse a single CSV record with given headers and values, returning the GooglePlace.
+    fn parse_one(headers: &[&str], values: &[&str]) -> GooglePlace {
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(headers).unwrap();
+        wtr.write_record(values).unwrap();
+        let data = String::from_utf8(wtr.into_inner().unwrap()).unwrap();
+
+        let mut reader = csv::Reader::from_reader(data.as_bytes());
+        let h = reader.headers().expect("headers").clone();
+        let r = reader.records().next().expect("first record").expect("valid record");
+        GooglePlace::from_csv_record(&r, &h)
+    }
+
+    #[test]
+    fn test_from_csv_record_minimal_extracts_place_id() {
+        let place = parse_one(
+            &["標題", "網址"],
+            &[
+                "Some Place",
+                "https://www.google.com/maps/place/Some+Place/data=!4m2!3m1!1sChIJabc123",
+            ],
+        );
+        assert_eq!(place.title.as_deref(), Some("Some Place"));
+        assert_eq!(place.place_id.as_deref(), Some("ChIJabc123"));
+        // No coords in this URL format
+        assert!(place.latitude.is_none());
+        assert!(place.longitude.is_none());
+        // All other enrichment fields remain None
+        assert!(place.place_name.is_none());
+        assert!(place.rating.is_none());
+        assert!(place.website.is_none());
+        assert!(place.description.is_none());
+        assert!(place.original_name.is_none());
+        assert!(place.english_name.is_none());
+    }
+
+    #[test]
+    fn test_from_csv_record_search_url_extracts_coords() {
+        let place = parse_one(
+            &["標題", "網址"],
+            &["", "https://www.google.com/maps/search/24.8583332,120.9927297"],
+        );
+        assert_eq!(place.latitude.as_deref(), Some("24.8583332"));
+        assert_eq!(place.longitude.as_deref(), Some("120.9927297"));
+        assert!(place.place_id.is_none());
+        assert!(place.title.as_deref() == Some(""));
+    }
+
+    #[test]
+    fn test_from_csv_record_no_url_no_enrichment() {
+        let place = parse_one(&["標題", "筆記"], &["Place Name", "Some notes"]);
+        assert_eq!(place.title.as_deref(), Some("Place Name"));
+        assert_eq!(place.notes.as_deref(), Some("Some notes"));
+        assert!(place.url.is_none());
+        assert!(place.latitude.is_none());
+        assert!(place.longitude.is_none());
+        assert!(place.place_id.is_none());
+    }
+
+    #[test]
+    fn test_from_csv_record_takeout_format_keeps_missing_fields_as_none() {
+        // Realistic Takeout CSV: only 標題, 筆記, 網址, 標籤, 留言 — no extra fields
+        let place = parse_one(
+            &["標題", "筆記", "網址", "標籤", "留言"],
+            &[
+                "Some Place",
+                "",
+                "https://www.google.com/maps/place/Some+Place/data=!4m2!3m1!1sChIJabc123",
+                "",
+                "",
+            ],
+        );
+        assert_eq!(place.title.as_deref(), Some("Some Place"));
+        assert_eq!(place.place_id.as_deref(), Some("ChIJabc123"));
+        assert!(place.rating.is_none());
+        assert!(place.website.is_none());
+        assert!(place.place_name.is_none());
+        assert!(place.description.is_none());
+        assert!(place.original_name.is_none());
+        assert!(place.english_name.is_none());
+        // Empty CSV fields → Some("")
+        assert_eq!(place.notes.as_deref(), Some(""));
+        assert_eq!(place.tags.as_deref(), Some(""));
+        assert_eq!(place.comments.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn test_from_csv_record_at_url_extracts_coords() {
+        let place = parse_one(
+            &["標題", "網址"],
+            &["Name", "https://www.google.com/maps/place/Name/@25.033,121.565,15z"],
+        );
+        assert_eq!(place.latitude.as_deref(), Some("25.033"));
+        assert_eq!(place.longitude.as_deref(), Some("121.565"));
+    }
+
+    #[test]
+    fn test_from_csv_record_q_url_extracts_coords() {
+        let place = parse_one(
+            &["標題", "網址"],
+            &["Name", "https://maps.google.com/?q=25.033,121.565"],
+        );
+        assert_eq!(place.latitude.as_deref(), Some("25.033"));
+        assert_eq!(place.longitude.as_deref(), Some("121.565"));
     }
 }
