@@ -55,10 +55,7 @@ impl GoogleMapsClient {
             reqwest::header::REFERER,
             "https://www.google.com/".parse().unwrap(),
         );
-        headers.insert(
-            "x-maps-diversion-context-bin",
-            "CAE=".parse().unwrap(),
-        );
+        headers.insert("x-maps-diversion-context-bin", "CAE=".parse().unwrap());
         headers.insert(
             reqwest::header::USER_AGENT,
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
@@ -115,9 +112,11 @@ impl GoogleMapsClient {
             crate::error::AppError::Parse("MAS response is not valid UTF-8".into())
         })?;
         // Log response summary for debugging
-        eprintln!("[MAS] 200 OK, response length={} stripped, first 200: {}",
+        eprintln!(
+            "[MAS] 200 OK, response length={} stripped, first 200: {}",
             body.len(),
-            &body[..body.len().min(200)]);
+            &body[..body.len().min(200)]
+        );
         let json: serde_json::Value = serde_json::from_str(body).map_err(|e| {
             let preview = &body[..body.len().min(500)];
             eprintln!("[MAS] JSON parse error: {}. Body: {}", e, preview);
@@ -151,10 +150,14 @@ impl GoogleMapsClient {
         list_id: &str,
         list_name: &str,
     ) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
-        let token = self.sapisid_value().map(compute_mas_token).unwrap_or_else(|| "A".into());
+        let token = self
+            .sapisid_value()
+            .map(compute_mas_token)
+            .unwrap_or_else(|| "A".into());
         let pb = format!(
             "!1m4!1s{id}!2e1!3m1!1e1!2e2!3e2!4i500!6m3!1s{token}!7e81!28e2!18i3!16b1",
-            id = list_id, token = token
+            id = list_id,
+            token = token
         );
         let url = "https://www.google.com/maps/preview/entitylist/getlist";
         let response = self
@@ -188,14 +191,19 @@ impl GoogleMapsClient {
         })?;
         let places = parse_getlist_places(&json, list_name)?;
         if places.is_empty() {
-            eprintln!("[getlist] '{}' returned 0 places. Raw response (first 500): {}",
-                list_name, &body[..body.len().min(500)]);
+            eprintln!(
+                "[getlist] '{}' returned 0 places. Raw response (first 500): {}",
+                list_name,
+                &body[..body.len().min(500)]
+            );
         }
         Ok(places)
     }
 
     /// High-level: get all places from all saved lists.
-    pub async fn get_all_saved_places(&self) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
+    pub async fn get_all_saved_places(
+        &self,
+    ) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
         let lists = self.fetch_saved_lists().await?;
         if lists.is_empty() {
             eprintln!("  No saved lists found (cookies may be expired).");
@@ -412,10 +420,12 @@ fn strip_xssi_bytes(data: &[u8]) -> Option<&str> {
 /// Parse the MAS endpoint response to extract saved lists.
 /// The saved lists are nested deep in the response array. We search through the
 /// top-level array for an element that contains saved place list entries.
-fn parse_mas_lists(value: &serde_json::Value) -> Result<Vec<GoogleSavedList>, crate::error::AppError> {
-    let root = value.as_array().ok_or_else(|| {
-        crate::error::AppError::Parse("MAS response root is not an array".into())
-    })?;
+fn parse_mas_lists(
+    value: &serde_json::Value,
+) -> Result<Vec<GoogleSavedList>, crate::error::AppError> {
+    let root = value
+        .as_array()
+        .ok_or_else(|| crate::error::AppError::Parse("MAS response root is not an array".into()))?;
 
     // The response is a sparse array. The saved lists are nested under one of the
     // top-level elements. Look for an element that is an array of the form:
@@ -471,7 +481,9 @@ fn parse_mas_lists(value: &serde_json::Value) -> Result<Vec<GoogleSavedList>, cr
             let place_count = arr.get(12).and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
             // Check for a URL in various positions
-            let url = arr.get(2).and_then(|v| v.as_array())
+            let url = arr
+                .get(2)
+                .and_then(|v| v.as_array())
                 .and_then(|a| a.get(2).and_then(|v| v.as_str()))
                 .map(|s| s.to_string());
 
@@ -561,7 +573,11 @@ fn parse_getlist_places(
     list_name: &str,
 ) -> Result<Vec<GoogleSavedPlace>, crate::error::AppError> {
     let mut places = Vec::new();
-    let root = match value.as_array().and_then(|a| a.first()).and_then(|v| v.as_array()) {
+    let root = match value
+        .as_array()
+        .and_then(|a| a.first())
+        .and_then(|v| v.as_array())
+    {
         Some(r) => r,
         None => return Ok(places),
     };
@@ -594,9 +610,9 @@ fn parse_getlist_places(
         let place_id = place_info
             .and_then(|pi| pi.get(7).and_then(|v| v.as_str()))
             .map(|s| s.to_string());
-        let url = place_id.as_ref().map(|id| {
-            format!("https://www.google.com/maps/place/?q=place_id:{}", id)
-        });
+        let url = place_id
+            .as_ref()
+            .map(|id| format!("https://www.google.com/maps/place/?q=place_id:{}", id));
         let notes = arr
             .get(3)
             .and_then(|v| v.as_str())
@@ -629,10 +645,9 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 const S: [u32; 64] = [
-    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-    5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
-    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9,
+    14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15,
+    21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
 ];
 
 const K: [u32; 64] = [
@@ -732,7 +747,12 @@ impl Md5State {
             let temp = d;
             d = c;
             c = b;
-            b = b.wrapping_add(a.wrapping_add(f).wrapping_add(K[i]).wrapping_add(m[g]).rotate_left(S[i]));
+            b = b.wrapping_add(
+                a.wrapping_add(f)
+                    .wrapping_add(K[i])
+                    .wrapping_add(m[g])
+                    .rotate_left(S[i]),
+            );
             a = temp;
         }
         state[0] = state[0].wrapping_add(a);

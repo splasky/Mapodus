@@ -37,7 +37,10 @@ pub async fn proxy_login(base_url: &str, username: &str, password: &str) -> Resu
         .await
         .context("failed to fetch login page")?;
     let login_headers = login_page.headers().clone();
-    let login_body = login_page.text().await.context("failed to read login page")?;
+    let login_body = login_page
+        .text()
+        .await
+        .context("failed to read login page")?;
 
     let csrf_token = extract_hidden_input(&login_body, "csrfmiddlewaretoken")
         .or_else(|| extract_cookie(&login_headers, "csrftoken"))
@@ -65,8 +68,8 @@ pub async fn proxy_login(base_url: &str, username: &str, password: &str) -> Resu
         return Err(anyhow!("Login failed ({status}): {body}"));
     }
 
-    let session_id =
-        extract_cookie(&headers, "sessionid").ok_or_else(|| anyhow!("Login succeeded but sessionid cookie was missing"))?;
+    let session_id = extract_cookie(&headers, "sessionid")
+        .ok_or_else(|| anyhow!("Login succeeded but sessionid cookie was missing"))?;
     let csrf_token = extract_cookie(&headers, "csrftoken").unwrap_or(csrf_token);
 
     let auth = CookieAuth {

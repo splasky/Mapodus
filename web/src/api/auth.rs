@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::extract::Query;
 use axum::response::{IntoResponse, Redirect};
-use axum::Json;
 use oauth2::basic::BasicClient;
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope,
@@ -19,15 +19,14 @@ pub struct AuthStatus {
 }
 
 pub async fn google_login(_session: Session) -> impl IntoResponse {
-    let client_id =
-        std::env::var("GOOGLE_CLIENT_ID").unwrap_or_else(|_| "dummy-client-id".into());
-    let client_secret = std::env::var("GOOGLE_CLIENT_SECRET")
-        .unwrap_or_else(|_| "dummy-client-secret".into());
-    let redirect_url =
-        std::env::var("REDIRECT_URL").unwrap_or_else(|_| "http://localhost:8900/api/auth/google/callback".into());
+    let client_id = std::env::var("GOOGLE_CLIENT_ID").unwrap_or_else(|_| "dummy-client-id".into());
+    let client_secret =
+        std::env::var("GOOGLE_CLIENT_SECRET").unwrap_or_else(|_| "dummy-client-secret".into());
+    let redirect_url = std::env::var("REDIRECT_URL")
+        .unwrap_or_else(|_| "http://localhost:8900/api/auth/google/callback".into());
 
-    let auth_url =
-        AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".into()).expect("Invalid auth URL");
+    let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".into())
+        .expect("Invalid auth URL");
     let token_url =
         TokenUrl::new("https://oauth2.googleapis.com/token".into()).expect("Invalid token URL");
 
@@ -35,10 +34,7 @@ pub async fn google_login(_session: Session) -> impl IntoResponse {
         .set_client_secret(ClientSecret::new(client_secret))
         .set_auth_uri(auth_url)
         .set_token_uri(token_url)
-        .set_redirect_uri(
-            RedirectUrl::new(redirect_url)
-                .expect("Invalid redirect URL"),
-        );
+        .set_redirect_uri(RedirectUrl::new(redirect_url).expect("Invalid redirect URL"));
 
     let (auth_url, _csrf_token) = client
         .authorize_url(CsrfToken::new_random)
@@ -88,15 +84,14 @@ pub async fn google_callback(
         None => return Redirect::to("/?error=no_code").into_response(),
     };
 
-    let client_id =
-        std::env::var("GOOGLE_CLIENT_ID").unwrap_or_else(|_| "dummy-client-id".into());
-    let client_secret = std::env::var("GOOGLE_CLIENT_SECRET")
-        .unwrap_or_else(|_| "dummy-client-secret".into());
-    let redirect_url =
-        std::env::var("REDIRECT_URL").unwrap_or_else(|_| "http://localhost:8900/api/auth/google/callback".into());
+    let client_id = std::env::var("GOOGLE_CLIENT_ID").unwrap_or_else(|_| "dummy-client-id".into());
+    let client_secret =
+        std::env::var("GOOGLE_CLIENT_SECRET").unwrap_or_else(|_| "dummy-client-secret".into());
+    let redirect_url = std::env::var("REDIRECT_URL")
+        .unwrap_or_else(|_| "http://localhost:8900/api/auth/google/callback".into());
 
-    let auth_url =
-        AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".into()).expect("Invalid auth URL");
+    let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".into())
+        .expect("Invalid auth URL");
     let token_url =
         TokenUrl::new("https://oauth2.googleapis.com/token".into()).expect("Invalid token URL");
 
@@ -104,10 +99,7 @@ pub async fn google_callback(
         .set_client_secret(ClientSecret::new(client_secret))
         .set_auth_uri(auth_url)
         .set_token_uri(token_url)
-        .set_redirect_uri(
-            RedirectUrl::new(redirect_url)
-                .expect("Invalid redirect URL"),
-        );
+        .set_redirect_uri(RedirectUrl::new(redirect_url).expect("Invalid redirect URL"));
 
     let http_client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
@@ -129,7 +121,8 @@ pub async fn google_callback(
 
     let access_token = token.access_token().secret();
 
-    let people_url = "https://people.googleapis.com/v1/people/me?personFields=names,email_addresses";
+    let people_url =
+        "https://people.googleapis.com/v1/people/me?personFields=names,email_addresses";
     let people_response = http_client
         .get(people_url)
         .bearer_auth(access_token)
@@ -149,10 +142,7 @@ pub async fn google_callback(
                     .and_then(|e| e.value);
 
                 let mut app = AppSession::from_session(&session).await;
-                app.google_user = Some(crate::session::GoogleUser {
-                    name,
-                    email,
-                });
+                app.google_user = Some(crate::session::GoogleUser { name, email });
                 app.save_to_session(&session).await;
             }
         }

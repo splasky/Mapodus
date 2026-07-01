@@ -1,5 +1,5 @@
-use anyhow::{Result, anyhow};
 use super::auth::CookieAuth;
+use anyhow::{Result, anyhow};
 
 fn layer_id_to_string(id: Option<&serde_json::Value>) -> Option<String> {
     id.and_then(|v| {
@@ -132,7 +132,13 @@ impl UmapClient {
             .unwrap_or_else(|| {
                 name.to_lowercase()
                     .chars()
-                    .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+                    .map(|c| {
+                        if c.is_alphanumeric() || c == '-' {
+                            c
+                        } else {
+                            '-'
+                        }
+                    })
                     .collect::<String>()
                     .trim_matches('-')
                     .to_string()
@@ -239,16 +245,14 @@ impl UmapClient {
         layer_name: &str,
         auth: &CookieAuth,
     ) -> Result<String> {
-        if let Some(id) = self
-            .find_existing_layer(map_id, layer_name, auth)
-            .await?
-        {
+        if let Some(id) = self.find_existing_layer(map_id, layer_name, auth).await? {
             return Ok(id);
         }
 
         Err(anyhow::anyhow!(
             "No existing layer '{}' found on map {}.",
-            layer_name, map_id
+            layer_name,
+            map_id
         ))
     }
 
@@ -297,7 +301,8 @@ impl UmapClient {
         let response_text = response.text().await?;
         let _layer_data: serde_json::Value = serde_json::from_str(&response_text)?;
 
-        self.upload_geojson(map_id, &layer_id, layer_name, geojson, auth).await?;
+        self.upload_geojson(map_id, &layer_id, layer_name, geojson, auth)
+            .await?;
 
         Ok(layer_id)
     }
