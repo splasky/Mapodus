@@ -1,11 +1,11 @@
-use std::collections::HashMap;
 use axum::Json;
+use std::collections::HashMap;
 
 use axum::extract::Multipart;
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
-use umap_core::google::{GooglePlace, parse_takeout, extract_coords_from_url};
+use umap_core::google::{GooglePlace, extract_coords_from_url, parse_takeout};
 
 use crate::api::errors::ApiError;
 use crate::session::AppSession;
