@@ -1,5 +1,5 @@
-use std::fmt::{self, Display};
 use std::error::Error;
+use std::fmt::{self, Display};
 
 #[derive(Debug, Clone)]
 pub enum AppError {
@@ -25,5 +25,17 @@ impl Error for AppError {}
 impl From<anyhow::Error> for AppError {
     fn from(error: anyhow::Error) -> Self {
         AppError::Config(error.to_string())
+    }
+}
+
+impl From<reqwest::Error> for AppError {
+    fn from(error: reqwest::Error) -> Self {
+        AppError::Http(error.to_string())
+    }
+}
+
+impl From<serde_json::Error> for AppError {
+    fn from(error: serde_json::Error) -> Self {
+        AppError::Parse(error.to_string())
     }
 }

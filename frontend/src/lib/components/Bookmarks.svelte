@@ -1,7 +1,7 @@
 <script lang="ts">
   import { apiGet } from '../api';
 
-  let { onSelect }: { onSelect: () => void } = $props();
+  let { onSelect, onPrev, onNext }: { onSelect: () => void; onPrev?: () => void; onNext?: () => void } = $props();
   let bookmarks = $state<any[]>([]);
   let selected = $state<Set<number>>(new Set());
   let loading = $state(true);
@@ -79,8 +79,13 @@
       {/each}
     </div>
 
-    <button onclick={proceed} disabled={selected.size === 0}>
+    <button class="primary" onclick={proceed} disabled={selected.size === 0}>
       Transfer {selected.size} bookmarks to uMap
     </button>
   {/if}
+
+  <div class="nav-row">
+    <button class="nav-prev" onclick={onPrev}>Previous</button>
+    <button class="nav-next" onclick={onNext}>Next</button>
+  </div>
 </div>

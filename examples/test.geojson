@@ -1,0 +1,43 @@
+{
+	"type": "FeatureCollection",
+	"features": [
+		{
+			"type": "Feature",
+			"properties": {
+				"name": "六扇門時尚湯鍋 新竹東南店",
+				"description": "名稱: 六扇門時尚湯鍋 新竹東南店\nEnglish: 6owl door Hsinchu Dongnan Branch\nGoogle Maps: https://www.google.com/maps/place/6owl+door+Hsinchu+Dongnan+Branch/data=!4m2!3m1!1s0x346835e9aa147b0b:0x8e09cb932ab96f34\nRating: 4.0\nNote: \nTags: \nWebsite: https://www.facebook.com/%E5%85%AD%E6%89%87%E9%96%80%E6%99%82%E5%B0%9A%E6%B9%AF%E9%8D%8B-%E6%96%B0%E7%AB%B9%E6%9D%B1%E5%8D%97%E5%BA%97-118580048759570/?fref=ts"
+			},
+			"geometry": { "type": "Point", "coordinates": [120.9730098, 24.7994433] }
+		},
+		{
+			"type": "Feature",
+			"properties": {
+				"name": "新豐車站",
+				"description": "名稱: 新豐車站\nEnglish: Xinfeng Train Station\nGoogle Maps: https://www.google.com/maps/place/%E6%96%B0%E8%B1%90%E8%BB%8A%E7%AB%99/data=!4m2!3m1!1s0x346831505ce20595:0x1d13efe96c43c466\nRating: 3.9\nNote: \nTags: "
+			},
+			"geometry": {
+				"type": "Point",
+				"coordinates": [120.9964533, 24.869253099999998]
+			}
+		},
+		{
+			"type": "Feature",
+			"properties": {
+				"name": "明新科技大學",
+				"description": "名稱: 明新科技大學\nEnglish: Minghsin University of Science and Technology\nGoogle Maps: https://www.google.com/maps/place/%E6%98%8E%E6%96%B0%E7%A7%91%E6%8A%80%E5%A4%A7%E5%AD%B8/data=!4m2!3m1!1s0x34683154faa8283b:0x92cb1c5564a574ef\nRating: 3.8\nNote: \nTags: \nWebsite: http://www.must.edu.tw/"
+			},
+			"geometry": {
+				"type": "Point",
+				"coordinates": [120.99066479999999, 24.864198599999998]
+			}
+		},
+		{
+			"type": "Feature",
+			"properties": {
+				"name": "Google Maps: https://www.google.com/maps/search/24.8583332,120.9927297",
+				"description": "名稱: Google Maps: https://www.google.com/maps/search/24.8583332,120.9927297\nGoogle Maps: https://www.google.com/maps/search/24.8583332,120.9927297\nRating: \nNote: \nTags: "
+			},
+			"geometry": { "type": "Point", "coordinates": [120.9927297, 24.8583332] }
+		}
+	]
+}

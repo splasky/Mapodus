@@ -1,74 +1,116 @@
-# Google map marker to OSM map
+# Google Maps to uMap
+
 > [!WARNING]
-> This project is still under development. The code may change recently. Please don't use in production environments.
+> This project is still under development. The code may change frequently. Not recommended for production use.
+
+Import your Google Maps saved places into [uMap](https://umap.openstreetmap.fr/) — as a web app or CLI tool.
 
 ## Features
-* Download user's Google Maps saved places (清單)
-* Convert the data points onto uMap
-* Upload data points onto uMap with fields: 標題(Title), 筆記(Notes), 網址(URL), 標籤(Tags), 留言(Comments), 緯度(Latitude), 經度(Longitude), 地點名稱(Place Name), 星級評分(Rating), 網站(Website), 簡介(Description), 原文名稱(Original Name), 英文名稱(English Name)
 
-## Usage
+- **Live Google Maps import** (via cookies) — fetch all saved lists and places directly
+- **Google Takeout CSV import** — upload a Saved.csv export; missing coordinates are auto-extracted from URLs
+- **Cookie-based enrichment** — optionally paste Google cookies to fill in addresses and missing data
+- **uMap upload** — creates a new map (or one map per list) with bilingual properties (Chinese + English)
+- **CLI mode** — headless conversion from CSV or GeoJSON to uMap
+
+## Web UI
+
+### Prerequisites
+
+- Rust nightly toolchain
+- Node.js 22+ and npm
+
+### Setup
+
+```bash
+# Build the backend
+cargo build --workspace
+
+# Build the frontend
+cd frontend && npm install && npm run build && cd ..
+
+# Copy .env.example to .env and edit with your settings
+# Required: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (for OAuth login)
+# Optional: REDIRECT_URL, DEV_MODE, DATABASE_URL
+
+# Start the server
+cargo run --bin web
+```
+
+Open **http://localhost:8900** in your browser.
+
+### Usage flow
+
+1. **Sign in** with Google (OAuth) — used only for session identity
+2. **Import** — choose **Google Takeout CSV** or **Live Google Maps import (cookies)**
+3. **Select bookmarks** — pick which places to transfer
+4. **Connect uMap** — enter your uMap instance URL and session cookies
+5. **Transfer** — places are uploaded as markers to a new uMap map
+
+## CLI
 
 ```
 google-maps-to-umap [OPTIONS]
 ```
 
-### Options
-
 | Flag | Description |
 |------|-------------|
-| `-t, --takeout <FILE>` | Path to Google Takeout CSV or JSON file |
-| `-g, --geojson <FILE>` | Path to existing GeoJSON file (alternative to --takeout) |
+| `-t, --takeout <FILE>` | Path to Google Takeout CSV |
+| `-g, --geojson <FILE>` | Path to existing GeoJSON file |
 | `-o, --output <FILE>` | Output GeoJSON file path (skip uMap upload) |
 | `--umap-url <URL>` | uMap instance URL (default: `https://umap.openstreetmap.fr/en/`) |
 | `--umap-map-id <ID>` | uMap map ID to upload to |
-| `--umap-cookie <COOKIE>` | uMap session cookie (format: `sessionid=xxx; csrftoken=xxx`) |
+| `--umap-cookie <COOKIE>` | Session cookie (`sessionid=xxx; csrftoken=xxx`) |
 | `--layer-name <NAME>` | Target layer name (default: `Google Maps Saved`) |
-| `-h, --help` | Print help |
 
 ### Examples
 
-**Convert Google Takeout export and upload to uMap:**
-```
-google-maps-to-umap \
-  --takeout ./Saved.csv \
-  --umap-map-id 123456 \
-  --umap-cookie "sessionid=xxx; csrftoken=xxx"
-```
+```bash
+# Convert CSV to GeoJSON locally
+google-maps-to-umap --takeout ./Saved.csv --output ./places.geojson
 
-**Convert only (save GeoJSON locally):**
-```
-google-maps-to-umap \
-  --takeout ./Saved.csv \
-  --output ./places.geojson
-```
-
-**Upload existing GeoJSON to uMap:**
-```
-google-maps-to-umap \
-  --geojson ./places.geojson \
-  --umap-map-id 123456 \
-  --umap-cookie "sessionid=xxx; csrftoken=xxx"
+# Convert and upload to uMap
+google-maps-to-umap --takeout ./Saved.csv --umap-map-id 123456 --umap-cookie "sessionid=xxx; csrftoken=xxx"
 ```
 
 ## Authentication
 
-### Google Maps Data
-The tool reads saved places from **Google Takeout** exports. To get your data:
-1. Go to [takeout.google.com](https://takeout.google.com)
-2. Deselect all, then select **Saved** (export as CSV) and/or **Maps (your places)** (export as JSON/GeoJSON)
-3. Download and extract the archive
+### Google OAuth (web UI)
+Sign in with your Google account. The app uses OAuth 2.0 (email + profile scopes only).
 
-### uMap Authentication
-uMap does not yet have a stable public API with API keys. Authentication is done via **browser session cookies**:
-1. Log in to [umap.openstreetmap.fr](https://umap.openstreetmap.fr/en/) in your browser
-2. Open Developer Tools → Application/Storage → Cookies
-3. Copy the `sessionid` and `csrftoken` values
-4. Pass them as `--umap-cookie "sessionid=xxx; csrftoken=xxx"`
+### Google Maps cookies (live import)
+1. Open [google.com/maps](https://www.google.com/maps) in your browser
+2. Open Developer Tools → Application → Cookies
+3. Copy all cookies as a string
+4. Paste into the cookie textarea in the import step
 
-## Build
+### uMap cookies
+1. Log in to your uMap instance
+2. Copy the `sessionid` and `csrftoken` cookies
+3. Enter them in the "Connect uMap" step
+
+## Development
+
+```bash
+# Start the backend in watch mode
+cargo watch -x run --bin web
+
+# Start the frontend dev server (hot-reload)
+cd frontend && npm run dev
+```
+
+The frontend dev server runs on port 5173 with API proxied to `localhost:8900`.
+
+### Project structure
 
 ```
-cargo build --release
+├── core/           # Core library (parsing, conversion, API client)
+├── cli/            # CLI binary
+├── web/            # Web server (Axum)
+├── frontend/       # Svelte SPA
+└── umap/           # uMap submodule (for local testing)
 ```
 
+## License
+
+Apache-2.0

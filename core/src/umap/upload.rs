@@ -1,5 +1,5 @@
-use anyhow::{Result, anyhow};
 use super::auth::CookieAuth;
+use anyhow::{Result, anyhow};
 
 fn layer_id_to_string(id: Option<&serde_json::Value>) -> Option<String> {
     id.and_then(|v| {
@@ -8,6 +8,12 @@ fn layer_id_to_string(id: Option<&serde_json::Value>) -> Option<String> {
             .or_else(|| v.as_i64().map(|n| n.to_string()))
             .or_else(|| v.as_f64().map(|n| n.to_string()))
     })
+}
+
+#[derive(Debug, Clone)]
+pub struct MapCreationResult {
+    pub id: String,
+    pub slug: String,
 }
 
 #[derive(Debug)]
@@ -70,7 +76,7 @@ impl UmapClient {
         name: &str,
         fc: &geojson::FeatureCollection,
         auth: &CookieAuth,
-    ) -> Result<String> {
+    ) -> Result<MapCreationResult> {
         let create_url = format!("{}/map/create/", self.base_url);
 
         let (lon, lat) = Self::compute_center(fc).unwrap_or((0.0, 0.0));
@@ -119,6 +125,25 @@ impl UmapClient {
             .and_then(|v| v.as_u64())
             .ok_or_else(|| anyhow::anyhow!("No map id in create response: {}", json_text))?;
 
+        let slug = map_data
+            .get("slug")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                name.to_lowercase()
+                    .chars()
+                    .map(|c| {
+                        if c.is_alphanumeric() || c == '-' {
+                            c
+                        } else {
+                            '-'
+                        }
+                    })
+                    .collect::<String>()
+                    .trim_matches('-')
+                    .to_string()
+            });
+
         let owner_id = map_data
             .get("permissions")
             .and_then(|p| p.get("owner"))
@@ -133,7 +158,10 @@ impl UmapClient {
             println!("Warning: Failed to set map permissions: {}", e);
         }
 
-        Ok(map_id.to_string())
+        Ok(MapCreationResult {
+            id: map_id.to_string(),
+            slug,
+        })
     }
 
     pub async fn set_map_permissions(
@@ -191,16 +219,14 @@ impl UmapClient {
         if let Some(datalayers) = geojson_data
             .get("properties")
             .and_then(|p| p.get("datalayers"))
+            && let Some(layers) = datalayers.as_array()
         {
-            if let Some(layers) = datalayers.as_array() {
-                for layer in layers {
-                    if let Some(name) = layer.get("name").and_then(|n| n.as_str()) {
-                        if name == layer_name {
-                            if let Some(id) = layer_id_to_string(layer.get("id")) {
-                                return Ok(Some(id));
-                            }
-                        }
-                    }
+            for layer in layers {
+                if let Some(name) = layer.get("name").and_then(|n| n.as_str())
+                    && name == layer_name
+                    && let Some(id) = layer_id_to_string(layer.get("id"))
+                {
+                    return Ok(Some(id));
                 }
             }
         }
@@ -217,16 +243,14 @@ impl UmapClient {
         layer_name: &str,
         auth: &CookieAuth,
     ) -> Result<String> {
-        if let Some(id) = self
-            .find_existing_layer(map_id, layer_name, auth)
-            .await?
-        {
+        if let Some(id) = self.find_existing_layer(map_id, layer_name, auth).await? {
             return Ok(id);
         }
 
         Err(anyhow::anyhow!(
             "No existing layer '{}' found on map {}.",
-            layer_name, map_id
+            layer_name,
+            map_id
         ))
     }
 
@@ -275,7 +299,8 @@ impl UmapClient {
         let response_text = response.text().await?;
         let _layer_data: serde_json::Value = serde_json::from_str(&response_text)?;
 
-        self.upload_geojson(map_id, &layer_id, layer_name, geojson, auth).await?;
+        self.upload_geojson(map_id, &layer_id, layer_name, geojson, auth)
+            .await?;
 
         Ok(layer_id)
     }
