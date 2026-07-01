@@ -53,6 +53,7 @@ pub async fn google_login(_session: Session) -> impl IntoResponse {
 #[derive(Deserialize)]
 pub struct CallbackParams {
     code: Option<String>,
+    #[allow(dead_code)]
     state: Option<String>,
     error: Option<String>,
 }
