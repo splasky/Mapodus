@@ -248,6 +248,28 @@ impl Converter {
                     serde_json::Value::String(desc_lines.join("\n")),
                 );
 
+                // Add all individual fields as separate properties for uMap data table
+                // Always include every key (empty string when None) so uMap shows all columns
+                macro_rules! set_prop {
+                    ($en:expr, $val:expr) => {
+                        let v = $val.as_deref().unwrap_or("");
+                        properties
+                            .insert($en.to_string(), serde_json::Value::String(v.to_string()));
+                    };
+                }
+                set_prop!("title", place.title);
+                set_prop!("notes", place.notes);
+                set_prop!("url", place.url);
+                set_prop!("tags", place.tags);
+                set_prop!("comments", place.comments);
+                set_prop!("latitude", place.latitude);
+                set_prop!("longitude", place.longitude);
+                set_prop!("place_name", place.place_name);
+                set_prop!("rating", place.rating);
+                set_prop!("website", place.website);
+                set_prop!("original_name", place.original_name);
+                set_prop!("english_name", place.english_name);
+
                 Some(Feature {
                     bbox: None,
                     geometry: Some(geometry),
@@ -263,5 +285,145 @@ impl Converter {
             features,
             foreign_members: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::google::GooglePlace;
+
+    fn make_place(
+        title: Option<&str>,
+        latitude: Option<&str>,
+        longitude: Option<&str>,
+    ) -> GooglePlace {
+        GooglePlace {
+            title: title.map(|s| s.to_string()),
+            notes: None,
+            url: Some("https://maps.google.com/".to_string()),
+            tags: None,
+            comments: None,
+            latitude: latitude.map(|s| s.to_string()),
+            longitude: longitude.map(|s| s.to_string()),
+            place_name: None,
+            rating: None,
+            website: None,
+            description: None,
+            original_name: None,
+            english_name: None,
+            place_id: None,
+        }
+    }
+
+    #[test]
+    fn test_to_umap_geojson_all_english_fields_present() {
+        let place = GooglePlace {
+            title: Some("Test Place".to_string()),
+            notes: None,
+            url: Some("https://maps.google.com/".to_string()),
+            tags: None,
+            comments: None,
+            latitude: Some("25.033".to_string()),
+            longitude: Some("121.565".to_string()),
+            place_name: None,
+            rating: None,
+            website: None,
+            description: None,
+            original_name: None,
+            english_name: None,
+            place_id: Some("ChIJabc".to_string()),
+        };
+        let fc = Converter::to_umap_geojson(&[place]);
+        assert_eq!(fc.features.len(), 1);
+        let props = fc.features[0].properties.as_ref().unwrap();
+
+        let english_keys = [
+            "title",
+            "notes",
+            "url",
+            "tags",
+            "comments",
+            "latitude",
+            "longitude",
+            "place_name",
+            "rating",
+            "website",
+            "original_name",
+            "english_name",
+        ];
+        for key in &english_keys {
+            assert!(props.contains_key(*key), "Missing key: {}", key);
+            assert!(
+                props.get(*key).and_then(|v| v.as_str()).is_some(),
+                "Key {} is not a string",
+                key
+            );
+        }
+
+        // Fields that were Some
+        assert_eq!(
+            props.get("title").and_then(|v| v.as_str()),
+            Some("Test Place")
+        );
+        assert_eq!(
+            props.get("url").and_then(|v| v.as_str()),
+            Some("https://maps.google.com/")
+        );
+        assert_eq!(
+            props.get("latitude").and_then(|v| v.as_str()),
+            Some("25.033")
+        );
+        assert_eq!(
+            props.get("longitude").and_then(|v| v.as_str()),
+            Some("121.565")
+        );
+
+        // Fields that were None → empty strings
+        assert_eq!(props.get("notes").and_then(|v| v.as_str()), Some(""));
+        assert_eq!(props.get("tags").and_then(|v| v.as_str()), Some(""));
+        assert_eq!(props.get("comments").and_then(|v| v.as_str()), Some(""));
+        assert_eq!(props.get("place_name").and_then(|v| v.as_str()), Some(""));
+        assert_eq!(props.get("rating").and_then(|v| v.as_str()), Some(""));
+        assert_eq!(props.get("website").and_then(|v| v.as_str()), Some(""));
+        assert_eq!(
+            props.get("original_name").and_then(|v| v.as_str()),
+            Some("")
+        );
+        assert_eq!(props.get("english_name").and_then(|v| v.as_str()), Some(""));
+    }
+
+    #[test]
+    fn test_to_umap_geojson_name_falls_back_to_place_name() {
+        let place = make_place(None, Some("25.0"), Some("121.0"));
+        let fc = Converter::to_umap_geojson(&[place]);
+        let props = fc.features[0].properties.as_ref().unwrap();
+        // name should be empty since both title and place_name are None
+        assert_eq!(props.get("name").and_then(|v| v.as_str()), Some(""));
+    }
+
+    #[test]
+    fn test_to_geojson_skips_fields_when_none() {
+        let place = make_place(Some("Name"), Some("25.0"), Some("121.0"));
+        let fc = Converter::to_geojson(&[place]);
+        assert_eq!(fc.features.len(), 1);
+        let props = fc.features[0].properties.as_ref().unwrap();
+        // to_geojson omits None fields entirely
+        assert!(props.contains_key("title"));
+        assert!(!props.contains_key("notes"));
+    }
+
+    #[test]
+    fn test_to_geojson_skips_feature_without_coords() {
+        let place = make_place(Some("No coords"), None, None);
+        let fc = Converter::to_geojson(&[place]);
+        assert_eq!(fc.features.len(), 0);
+    }
+
+    #[test]
+    fn test_to_umap_geojson_skips_feature_without_coords() {
+        let place = make_place(Some("No coords"), None, None);
+        let fc = Converter::to_umap_geojson(&[place]);
+        assert_eq!(fc.features.len(), 0);
     }
 }

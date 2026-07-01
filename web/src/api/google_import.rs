@@ -153,6 +153,7 @@ pub async fn confirm(
                 description: p.address.clone(),
                 original_name: None,
                 english_name: None,
+                place_id: p.place_id.clone(),
             }
         })
         .collect();

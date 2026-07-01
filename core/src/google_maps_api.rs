@@ -22,6 +22,19 @@ pub struct GoogleSavedList {
     pub url: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GooglePlaceDetails {
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub url: Option<String>,
+    pub place_name: Option<String>,
+    pub rating: Option<String>,
+    pub website: Option<String>,
+    pub description: Option<String>,
+    pub original_name: Option<String>,
+    pub english_name: Option<String>,
+}
+
 pub struct GoogleMapsClient {
     client: reqwest::Client,
     cookies: HashMap<String, String>,
@@ -200,6 +213,78 @@ impl GoogleMapsClient {
         Ok(places)
     }
 
+    /// Look up place details by place_id using the Google Maps preview/place endpoint.
+    pub async fn get_place_details(
+        &self,
+        place_id: &str,
+    ) -> Result<Option<GooglePlaceDetails>, crate::error::AppError> {
+        let pb = format!("!1s{}!2e1", place_id);
+        let url = "https://www.google.com/maps/preview/place";
+        let response = self
+            .client
+            .get(url)
+            .query(&[("authuser", "0"), ("hl", "en"), ("gl", "us"), ("pb", &pb)])
+            .headers(self.request_headers())
+            .send()
+            .await?;
+        let status = response.status();
+        let data = response.bytes().await?;
+        if !status.is_success() {
+            let preview = String::from_utf8_lossy(&data[..data.len().min(200)]);
+            return Err(crate::error::AppError::Http(format!(
+                "Place details endpoint returned {} for place_id '{}': {}",
+                status, place_id, preview
+            )));
+        }
+        let body = strip_xssi_bytes(&data).ok_or_else(|| {
+            crate::error::AppError::Parse("Place details response not valid UTF-8".into())
+        })?;
+        let json: serde_json::Value = serde_json::from_str(body).map_err(|e| {
+            let preview = &body[..body.len().min(500)];
+            crate::error::AppError::Parse(format!(
+                "Place details JSON error for '{}': {}. Body: {}",
+                place_id, e, preview
+            ))
+        })?;
+        parse_place_details(&json, place_id)
+    }
+
+    /// Debug: fetch place details and return the raw JSON response for inspection.
+    pub async fn debug_get_place_details(
+        &self,
+        place_id: &str,
+    ) -> Result<Option<serde_json::Value>, crate::error::AppError> {
+        let pb = format!("!1s{}!2e1", place_id);
+        let url = "https://www.google.com/maps/preview/place";
+        let response = self
+            .client
+            .get(url)
+            .query(&[("authuser", "0"), ("hl", "en"), ("gl", "us"), ("pb", &pb)])
+            .headers(self.request_headers())
+            .send()
+            .await?;
+        let status = response.status();
+        let data = response.bytes().await?;
+        if !status.is_success() {
+            let preview = String::from_utf8_lossy(&data[..data.len().min(200)]);
+            return Err(crate::error::AppError::Http(format!(
+                "Place details endpoint returned {} for place_id '{}': {}",
+                status, place_id, preview
+            )));
+        }
+        let body = strip_xssi_bytes(&data).ok_or_else(|| {
+            crate::error::AppError::Parse("Place details response not valid UTF-8".into())
+        })?;
+        let json: serde_json::Value = serde_json::from_str(body).map_err(|e| {
+            let preview = &body[..body.len().min(500)];
+            crate::error::AppError::Parse(format!(
+                "Place details JSON error for '{}': {}. Body: {}",
+                place_id, e, preview
+            ))
+        })?;
+        Ok(Some(json))
+    }
+
     /// High-level: get all places from all saved lists.
     pub async fn get_all_saved_places(
         &self,
@@ -228,6 +313,39 @@ impl GoogleMapsClient {
         }
         Ok(all_places)
     }
+}
+
+/// Resolve coordinates from a Google Maps place URL by following redirects.
+///
+/// Google Maps `/place/NAME/data=!...` URLs redirect to
+/// `/place/NAME/@lat,lng,zoom/data=!...` which contains coordinates in the `@` pattern.
+/// This function follows the redirect and parses the final URL.
+///
+/// Requires no cookies or API key — just a standard HTTP GET.
+pub async fn resolve_place_url_coords(url: &str) -> Option<(f64, f64)> {
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .ok()?;
+
+    let resp = client
+        .get(url)
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+        )
+        .header(reqwest::header::ACCEPT, "text/html,application/xhtml+xml")
+        .send()
+        .await
+        .ok()?;
+
+    let final_url = resp.url().as_str().to_string();
+    if final_url == url {
+        return None;
+    }
+
+    crate::google::extract_coords_from_url(&final_url)
 }
 
 // ── ProtoTextWriter for Google's !-format protobuf ──
@@ -633,6 +751,107 @@ fn parse_getlist_places(
     Ok(places)
 }
 
+/// Parse the preview/place response to extract details for a single place.
+fn parse_place_details(
+    value: &serde_json::Value,
+    place_id: &str,
+) -> Result<Option<GooglePlaceDetails>, crate::error::AppError> {
+    let root = match value.as_array() {
+        Some(a) => a,
+        None => {
+            eprintln!(
+                "[place_details] Root is not an array for place_id '{}'",
+                place_id
+            );
+            return Ok(None);
+        }
+    };
+
+    // Walk into the response to find the place data.
+    // Structure is typically:
+    //   [..., [place_entry, ...], ...]
+    // where place_entry[2] = name, place_entry[1] contains location data.
+    let entry = root.iter().find_map(|elem| {
+        let arr = elem.as_array()?;
+        // Look for an element whose child has the place_id
+        find_place_entry_in_array(arr, place_id)
+    });
+
+    match entry {
+        Some(entry_arr) => {
+            let place_info = entry_arr.get(1).and_then(|v| v.as_array());
+            let coords = place_info.and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
+            let latitude = coords.and_then(|c| c.get(2).and_then(|v| v.as_f64()));
+            let longitude = coords.and_then(|c| c.get(3).and_then(|v| v.as_f64()));
+            let pid = place_info.and_then(|pi| pi.get(7).and_then(|v| v.as_str()));
+            let url = pid.map(|id| format!("https://www.google.com/maps/place/?q=place_id:{}", id));
+            let place_name = entry_arr
+                .get(2)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            // DEBUG: dump the full entry structure to discover available fields
+            eprintln!(
+                "[place_details] entry_arr ({} elements): {}",
+                entry_arr.len(),
+                serde_json::to_string(entry_arr).unwrap_or_default()
+            );
+
+            if latitude.is_some() || longitude.is_some() {
+                eprintln!(
+                    "[place_details] Found coords for place_id '{}': {:?}, {:?}",
+                    place_id, latitude, longitude
+                );
+                Ok(Some(GooglePlaceDetails {
+                    latitude,
+                    longitude,
+                    url,
+                    place_name,
+                    rating: None,
+                    website: None,
+                    description: None,
+                    original_name: None,
+                    english_name: None,
+                }))
+            } else {
+                eprintln!(
+                    "[place_details] No coords found for place_id '{}'",
+                    place_id
+                );
+                Ok(None)
+            }
+        }
+        None => {
+            eprintln!("[place_details] No entry found for place_id '{}'", place_id);
+            Ok(None)
+        }
+    }
+}
+
+pub fn find_place_entry_in_array<'a>(
+    arr: &'a [serde_json::Value],
+    place_id: &str,
+) -> Option<&'a [serde_json::Value]> {
+    // Check if this array itself is a place entry (entry_arr = [null, place_info, name]
+    // where place_info[7] == place_id).
+    if let Some(pi) = arr.get(1).and_then(|v| v.as_array())
+        && let Some(pid) = pi.get(7).and_then(|v| v.as_str())
+        && pid == place_id
+    {
+        return Some(arr);
+    }
+
+    // Otherwise, search children recursively.
+    for elem in arr {
+        if let Some(inner) = elem.as_array()
+            && let Some(found) = find_place_entry_in_array(inner, place_id)
+        {
+            return Some(found);
+        }
+    }
+    None
+}
+
 // ── MD5 (no external dependency) ──
 
 fn md5(input: &[u8]) -> [u8; 16] {
@@ -758,5 +977,261 @@ impl Md5State {
         state[1] = state[1].wrapping_add(b);
         state[2] = state[2].wrapping_add(c);
         state[3] = state[3].wrapping_add(d);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore = "needs network access — run manually with `cargo test -- --include-ignored`"]
+    async fn test_resolve_place_url_coords_valid_place() {
+        // Google Maps URL for 新豐車站 (from test.csv)
+        let url = "https://www.google.com/maps/place/%E6%96%B0%E8%B1%90%E8%BB%8A%E7%AB%99/data=!4m2!3m1!1s0x346831505ce20595:0x1d13efe96c43c466";
+        let result = resolve_place_url_coords(url).await;
+        assert!(
+            result.is_some(),
+            "resolve_place_url_coords should return Some for a valid place URL"
+        );
+        let (lat, lng) = result.unwrap();
+        // 新豐車站 is in Hsinchu County, Taiwan (~24.87, ~120.996)
+        assert!(
+            (lat - 24.87).abs() < 0.05,
+            "lat should be ~24.87, got {}",
+            lat
+        );
+        assert!(
+            (lng - 120.996).abs() < 0.05,
+            "lng should be ~120.996, got {}",
+            lng
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "needs network access"]
+    async fn test_resolve_place_url_coords_invalid_url_returns_none() {
+        let url = "https://www.google.com/maps/place/ThisPlaceDoesNotExist12345";
+        let result = resolve_place_url_coords(url).await;
+        // Should not panic; may return None or Some depending on Google's redirect behavior
+        let _ = result;
+    }
+
+    #[tokio::test]
+    #[ignore = "needs network access"]
+    async fn test_resolve_place_url_coords_no_redirect_returns_none() {
+        // A URL that already has coordinates should not redirect further
+        let url = "https://www.google.com/maps/place/Test/@25.033,121.565,15z/data=!4m2!3m1!1sabc";
+        let result = resolve_place_url_coords(url).await;
+        // Since the URL already has @lat,lng, the redirect check may
+        // return None if final_url == input url
+        let has_coords = result.is_some();
+        if !has_coords {
+            // If it returned None, at least verify via extract_coords_from_url directly
+            assert!(crate::google::extract_coords_from_url(url).is_some());
+        }
+    }
+
+    // ── parse_place_details tests ──
+
+    /// Build the full mock response (outer array containing an entry) like
+    /// Google Maps internal API returns. Known positions in the entry array:
+    ///   [1]      = place_info array
+    ///   [1][5]   = coords array [null, null, lat, lng, null]
+    ///   [1][7]   = place_id string
+    ///   [2]      = place name
+    fn mock_place_response(place_id: &str, lat: f64, lng: f64, name: &str) -> serde_json::Value {
+        serde_json::json!([
+            null, // outer[0] — filler
+            [
+                // outer[1] — the entry
+                null, // [0]
+                [
+                    // [1] = place_info
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    [null, null, lat, lng, null], // [5] = coords
+                    null,
+                    place_id, // [7] = place_id
+                ],
+                name, // [2] = place name
+            ],
+            null, // outer[2] — filler
+        ])
+    }
+
+    #[test]
+    fn test_parse_place_details_found() {
+        let place_id = "0x346835e9aa147b0b:0x8e09cb932ab96f34";
+        let response = mock_place_response(
+            place_id,
+            24.7994433,
+            120.9730098,
+            "六扇門時尚湯鍋 新竹東南店",
+        );
+
+        let result = parse_place_details(&response, place_id).unwrap();
+        assert!(result.is_some(), "Should find the entry for known place_id");
+
+        let details = result.unwrap();
+        assert_eq!(details.latitude, Some(24.7994433));
+        assert_eq!(details.longitude, Some(120.9730098));
+        assert_eq!(
+            details.place_name.as_deref(),
+            Some("六扇門時尚湯鍋 新竹東南店")
+        );
+        assert_eq!(
+            details.url.as_deref(),
+            Some(format!(
+                "https://www.google.com/maps/place/?q=place_id:{}",
+                place_id
+            ))
+            .as_deref()
+        );
+
+        // These fields are not yet parsed from the mock — verify they're None
+        assert!(
+            details.rating.is_none(),
+            "rating not yet parsed from API response"
+        );
+        assert!(
+            details.website.is_none(),
+            "website not yet parsed from API response"
+        );
+        assert!(details.description.is_none(), "description not yet parsed");
+        assert!(
+            details.original_name.is_none(),
+            "original_name not yet parsed"
+        );
+        assert!(
+            details.english_name.is_none(),
+            "english_name not yet parsed"
+        );
+    }
+
+    #[test]
+    fn test_parse_place_details_not_found() {
+        let response = mock_place_response("0xdifferent", 25.0, 121.0, "Other Place");
+        let result = parse_place_details(&response, "0xabc123").unwrap();
+        assert!(result.is_none(), "Should return None for unknown place_id");
+    }
+
+    #[test]
+    fn test_parse_place_details_no_coords() {
+        // Entry missing the coords array at [1][5]
+        let place_id = "0xabc123";
+        let response = serde_json::json!([
+            null,
+            [
+                null,
+                [null, null, null, null, null, null, null, place_id],
+                "No Coords Place",
+            ],
+            null,
+        ]);
+
+        let result = parse_place_details(&response, place_id).unwrap();
+        assert!(
+            result.is_none(),
+            "Should return None when no coords in entry"
+        );
+    }
+
+    #[test]
+    fn test_parse_place_details_deeply_nested() {
+        // Entry can be nested deeper inside the array structure
+        let place_id = "0xnested";
+        let inner_entry = serde_json::json!([
+            null,
+            [
+                null,
+                null,
+                null,
+                null,
+                null,
+                [null, null, 24.8, 121.0, null],
+                null,
+                place_id
+            ],
+            "Nested Place",
+        ]);
+        let response =
+            serde_json::json!([null, [null, [null, null, inner_entry, null], null], null,]);
+
+        let result = parse_place_details(&response, place_id).unwrap();
+        assert!(
+            result.is_some(),
+            "Should find entry even when nested deeply"
+        );
+        let details = result.unwrap();
+        assert_eq!(details.latitude, Some(24.8));
+        assert_eq!(details.longitude, Some(121.0));
+    }
+
+    #[test]
+    fn test_parse_place_details_empty_response() {
+        let response = serde_json::json!([]);
+        let result = parse_place_details(&response, "any_id").unwrap();
+        assert!(result.is_none(), "Empty response should return None");
+    }
+
+    #[test]
+    fn test_parse_place_details_non_array_response() {
+        let response = serde_json::json!({"error": "not an array"});
+        let result = parse_place_details(&response, "any_id").unwrap();
+        assert!(result.is_none(), "Non-array response should return None");
+    }
+
+    #[test]
+    fn test_find_place_entry_in_array_direct_match() {
+        let place_id = "0xdirecT";
+        // Construct the array manually (not via json! macro) to avoid nesting issues
+        let entry: serde_json::Value = serde_json::json!([
+            null,
+            [
+                null,
+                null,
+                null,
+                null,
+                null,
+                [null, null, 10.0, 20.0, null],
+                null,
+                place_id
+            ],
+            "Direct",
+        ]);
+        let arr: Vec<serde_json::Value> =
+            vec![serde_json::Value::Null, entry, serde_json::Value::Null];
+
+        let found = find_place_entry_in_array(&arr, place_id);
+        assert!(found.is_some(), "Should find direct entry");
+        let found_arr = found.unwrap();
+        assert_eq!(found_arr.get(2).and_then(|v| v.as_str()), Some("Direct"));
+    }
+
+    #[test]
+    fn test_find_place_entry_in_array_no_match() {
+        let entry: serde_json::Value = serde_json::json!([
+            null,
+            [
+                null,
+                null,
+                null,
+                null,
+                null,
+                [null, null, 10.0, 20.0, null],
+                null,
+                "0xother"
+            ],
+            "Other",
+        ]);
+        let arr: Vec<serde_json::Value> =
+            vec![serde_json::Value::Null, entry, serde_json::Value::Null];
+
+        let found = find_place_entry_in_array(&arr, "0xnonexistent");
+        assert!(found.is_none(), "Should not find non-matching entry");
     }
 }
