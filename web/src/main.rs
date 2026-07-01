@@ -2,9 +2,9 @@ mod api;
 mod session;
 
 use axum::Router;
+use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::get;
-use axum::http::StatusCode;
 use clap::Parser;
 use rust_embed::RustEmbed;
 use tower_http::cors::CorsLayer;
@@ -40,18 +40,16 @@ fn serve_static(path: &str) -> Response {
                 .body(axum::body::Body::from(content.data))
                 .unwrap()
         }
-        None => {
-            match StaticFiles::get("index.html") {
-                Some(content) => Response::builder()
-                    .header("Content-Type", "text/html")
-                    .body(axum::body::Body::from(content.data))
-                    .unwrap(),
-                None => Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(axum::body::Body::from("Not found"))
-                    .unwrap(),
-            }
-        }
+        None => match StaticFiles::get("index.html") {
+            Some(content) => Response::builder()
+                .header("Content-Type", "text/html")
+                .body(axum::body::Body::from(content.data))
+                .unwrap(),
+            None => Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(axum::body::Body::from("Not found"))
+                .unwrap(),
+        },
     }
 }
 
@@ -91,7 +89,10 @@ async fn run_dev_import(cookies_str: &str) {
         Ok(places) => {
             println!("\nSuccess! Imported {} places total.\n", places.len());
 
-            let mut list_map: std::collections::BTreeMap<String, Vec<&umap_core::google_maps_api::GoogleSavedPlace>> = std::collections::BTreeMap::new();
+            let mut list_map: std::collections::BTreeMap<
+                String,
+                Vec<&umap_core::google_maps_api::GoogleSavedPlace>,
+            > = std::collections::BTreeMap::new();
             for place in &places {
                 list_map.entry(place.list.clone()).or_default().push(place);
             }
@@ -127,8 +128,7 @@ async fn main() {
     }
 
     let session_store = MemoryStore::default();
-    let session_layer = SessionManagerLayer::new(session_store)
-        .with_secure(false);
+    let session_layer = SessionManagerLayer::new(session_store).with_secure(false);
 
     let api_routes = api::routes();
 

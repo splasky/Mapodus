@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::extract::Multipart;
 use axum::response::IntoResponse;
-use axum::Json;
 use serde::Serialize;
 use tower_sessions::Session;
 use umap_core::google::{GooglePlace, parse_takeout};
@@ -26,7 +26,13 @@ pub async fn upload(
         .map_err(|e| ApiError::BadRequest(e.to_string()))?
     {
         if field.name() == Some("file") {
-            csv_data = Some(field.bytes().await.map_err(|e| ApiError::BadRequest(e.to_string()))?.to_vec());
+            csv_data = Some(
+                field
+                    .bytes()
+                    .await
+                    .map_err(|e| ApiError::BadRequest(e.to_string()))?
+                    .to_vec(),
+            );
         }
     }
 
@@ -53,7 +59,10 @@ pub async fn upload(
 
 pub async fn list(session: Session) -> Result<impl IntoResponse, ApiError> {
     let app = AppSession::from_session(&session).await;
-    let bookmarks = app.bookmarks.clone().ok_or_else(|| ApiError::BadRequest("No bookmarks uploaded".into()))?;
+    let bookmarks = app
+        .bookmarks
+        .clone()
+        .ok_or_else(|| ApiError::BadRequest("No bookmarks uploaded".into()))?;
     let selected_ids = app.selected_ids.clone().unwrap_or_default();
 
     Ok(Json(BookmarkList {

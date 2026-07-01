@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use axum::response::IntoResponse;
 use axum::Json;
+use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use umap_core::google::GooglePlace;
@@ -22,9 +22,7 @@ pub struct DebugResponse {
     list_places: Option<serde_json::Value>,
 }
 
-pub async fn debug_import(
-    Json(req): Json<DebugRequest>,
-) -> Result<impl IntoResponse, ApiError> {
+pub async fn debug_import(Json(req): Json<DebugRequest>) -> Result<impl IntoResponse, ApiError> {
     let client = GoogleMapsClient::new(req.cookies);
 
     let lists = client

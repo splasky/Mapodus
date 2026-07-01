@@ -1,6 +1,6 @@
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use anyhow::{anyhow, Result};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CookieAuth {
@@ -35,7 +35,10 @@ impl CookieAuth {
     }
 
     pub fn to_cookie_header(&self) -> String {
-        format!("sessionid={}; csrftoken={}", self.session_id, self.csrf_token)
+        format!(
+            "sessionid={}; csrftoken={}",
+            self.session_id, self.csrf_token
+        )
     }
 
     pub fn to_csrf_header(&self) -> String {

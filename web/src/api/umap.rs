@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use axum::response::IntoResponse;
 use axum::Json;
+use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use umap_core::convert::Converter;
@@ -121,14 +121,22 @@ pub async fn transfer(
 ) -> Result<impl IntoResponse, ApiError> {
     let app = AppSession::from_session(&session).await;
 
-    let auth = app.umap_auth.clone()
+    let auth = app
+        .umap_auth
+        .clone()
         .ok_or_else(|| ApiError::Unauthorized("Not connected to uMap".into()))?;
-    let umap_url = app.umap_url.clone()
+    let umap_url = app
+        .umap_url
+        .clone()
         .ok_or_else(|| ApiError::Unauthorized("uMap URL not configured".into()))?;
-    let places = app.bookmarks.as_ref()
+    let places = app
+        .bookmarks
+        .as_ref()
         .ok_or_else(|| ApiError::BadRequest("No bookmarks uploaded".into()))?;
 
-    let selected: Vec<_> = req.selected_ids.iter()
+    let selected: Vec<_> = req
+        .selected_ids
+        .iter()
         .filter_map(|&i| places.get(i))
         .cloned()
         .collect();
@@ -146,7 +154,11 @@ pub async fn transfer(
             let list_name = place
                 .tags
                 .as_ref()
-                .and_then(|t| t.split(", ").find(|s| s.starts_with("list:")).map(|s| &s[5..]))
+                .and_then(|t| {
+                    t.split(", ")
+                        .find(|s| s.starts_with("list:"))
+                        .map(|s| &s[5..])
+                })
                 .unwrap_or("Unknown")
                 .to_string();
             groups.entry(list_name).or_default().push(place.clone());
@@ -183,7 +195,10 @@ pub async fn transfer(
 
         let result = client
             .create_map(
-                &format!("Google Maps Saved ({})", chrono::Local::now().format("%Y-%m-%d")),
+                &format!(
+                    "Google Maps Saved ({})",
+                    chrono::Local::now().format("%Y-%m-%d")
+                ),
                 &fc,
                 &auth,
             )
@@ -196,7 +211,12 @@ pub async fn transfer(
             .await
             .map_err(|e| ApiError::Internal(format!("Failed to upload: {}", e)))?;
 
-        let map_url = format!("{}/map/{}_{}", umap_url.trim_end_matches('/'), result.slug, result.id);
+        let map_url = format!(
+            "{}/map/{}_{}",
+            umap_url.trim_end_matches('/'),
+            result.slug,
+            result.id
+        );
 
         Ok(Json(TransferResponse {
             success: true,

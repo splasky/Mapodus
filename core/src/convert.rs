@@ -25,12 +25,18 @@ impl Converter {
                 let mut properties = Map::new();
 
                 if let Some(title) = &place.title {
-                    properties.insert("title".to_string(), serde_json::Value::String(title.clone()));
+                    properties.insert(
+                        "title".to_string(),
+                        serde_json::Value::String(title.clone()),
+                    );
                     properties.insert("标题".to_string(), serde_json::Value::String(title.clone()));
                 }
 
                 if let Some(notes) = &place.notes {
-                    properties.insert("notes".to_string(), serde_json::Value::String(notes.clone()));
+                    properties.insert(
+                        "notes".to_string(),
+                        serde_json::Value::String(notes.clone()),
+                    );
                     properties.insert("笔记".to_string(), serde_json::Value::String(notes.clone()));
                 }
 
@@ -45,48 +51,102 @@ impl Converter {
                 }
 
                 if let Some(comments) = &place.comments {
-                    properties.insert("comments".to_string(), serde_json::Value::String(comments.clone()));
-                    properties.insert("留言".to_string(), serde_json::Value::String(comments.clone()));
+                    properties.insert(
+                        "comments".to_string(),
+                        serde_json::Value::String(comments.clone()),
+                    );
+                    properties.insert(
+                        "留言".to_string(),
+                        serde_json::Value::String(comments.clone()),
+                    );
                 }
 
                 if let Some(lat_str) = &place.latitude {
-                    properties.insert("latitude".to_string(), serde_json::Value::String(lat_str.clone()));
-                    properties.insert("纬度".to_string(), serde_json::Value::String(lat_str.clone()));
+                    properties.insert(
+                        "latitude".to_string(),
+                        serde_json::Value::String(lat_str.clone()),
+                    );
+                    properties.insert(
+                        "纬度".to_string(),
+                        serde_json::Value::String(lat_str.clone()),
+                    );
                 }
 
                 if let Some(lon_str) = &place.longitude {
-                    properties.insert("longitude".to_string(), serde_json::Value::String(lon_str.clone()));
-                    properties.insert("经度".to_string(), serde_json::Value::String(lon_str.clone()));
+                    properties.insert(
+                        "longitude".to_string(),
+                        serde_json::Value::String(lon_str.clone()),
+                    );
+                    properties.insert(
+                        "经度".to_string(),
+                        serde_json::Value::String(lon_str.clone()),
+                    );
                 }
 
                 if let Some(place_name) = &place.place_name {
-                    properties.insert("place_name".to_string(), serde_json::Value::String(place_name.clone()));
-                    properties.insert("地点名称".to_string(), serde_json::Value::String(place_name.clone()));
+                    properties.insert(
+                        "place_name".to_string(),
+                        serde_json::Value::String(place_name.clone()),
+                    );
+                    properties.insert(
+                        "地点名称".to_string(),
+                        serde_json::Value::String(place_name.clone()),
+                    );
                 }
 
                 if let Some(rating) = &place.rating {
-                    properties.insert("rating".to_string(), serde_json::Value::String(rating.clone()));
-                    properties.insert("星级评分".to_string(), serde_json::Value::String(rating.clone()));
+                    properties.insert(
+                        "rating".to_string(),
+                        serde_json::Value::String(rating.clone()),
+                    );
+                    properties.insert(
+                        "星级评分".to_string(),
+                        serde_json::Value::String(rating.clone()),
+                    );
                 }
 
                 if let Some(website) = &place.website {
-                    properties.insert("website".to_string(), serde_json::Value::String(website.clone()));
-                    properties.insert("网站".to_string(), serde_json::Value::String(website.clone()));
+                    properties.insert(
+                        "website".to_string(),
+                        serde_json::Value::String(website.clone()),
+                    );
+                    properties.insert(
+                        "网站".to_string(),
+                        serde_json::Value::String(website.clone()),
+                    );
                 }
 
                 if let Some(description) = &place.description {
-                    properties.insert("description".to_string(), serde_json::Value::String(description.clone()));
-                    properties.insert("简介".to_string(), serde_json::Value::String(description.clone()));
+                    properties.insert(
+                        "description".to_string(),
+                        serde_json::Value::String(description.clone()),
+                    );
+                    properties.insert(
+                        "简介".to_string(),
+                        serde_json::Value::String(description.clone()),
+                    );
                 }
 
                 if let Some(original_name) = &place.original_name {
-                    properties.insert("original_name".to_string(), serde_json::Value::String(original_name.clone()));
-                    properties.insert("原文名称".to_string(), serde_json::Value::String(original_name.clone()));
+                    properties.insert(
+                        "original_name".to_string(),
+                        serde_json::Value::String(original_name.clone()),
+                    );
+                    properties.insert(
+                        "原文名称".to_string(),
+                        serde_json::Value::String(original_name.clone()),
+                    );
                 }
 
                 if let Some(english_name) = &place.english_name {
-                    properties.insert("english_name".to_string(), serde_json::Value::String(english_name.clone()));
-                    properties.insert("英文名称".to_string(), serde_json::Value::String(english_name.clone()));
+                    properties.insert(
+                        "english_name".to_string(),
+                        serde_json::Value::String(english_name.clone()),
+                    );
+                    properties.insert(
+                        "英文名称".to_string(),
+                        serde_json::Value::String(english_name.clone()),
+                    );
                 }
 
                 Some(Feature {
@@ -125,8 +185,15 @@ impl Converter {
 
                 let mut properties = Map::new();
 
-                let name = place.title.as_deref().or(place.place_name.as_deref()).unwrap_or("");
-                properties.insert("name".to_string(), serde_json::Value::String(name.to_string()));
+                let name = place
+                    .title
+                    .as_deref()
+                    .or(place.place_name.as_deref())
+                    .unwrap_or("");
+                properties.insert(
+                    "name".to_string(),
+                    serde_json::Value::String(name.to_string()),
+                );
 
                 let mut desc_lines = Vec::new();
 
@@ -176,7 +243,10 @@ impl Converter {
                     }
                 }
 
-                properties.insert("description".to_string(), serde_json::Value::String(desc_lines.join("\n")));
+                properties.insert(
+                    "description".to_string(),
+                    serde_json::Value::String(desc_lines.join("\n")),
+                );
 
                 Some(Feature {
                     bbox: None,

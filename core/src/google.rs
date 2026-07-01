@@ -1,7 +1,7 @@
+use anyhow::{Result, anyhow};
 use csv;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use anyhow::{Result, anyhow};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GooglePlace {
@@ -21,7 +21,10 @@ pub struct GooglePlace {
 }
 
 impl GooglePlace {
-    fn find_header_index(header_map: &std::collections::HashMap<String, usize>, english_name: &str) -> Option<usize> {
+    fn find_header_index(
+        header_map: &std::collections::HashMap<String, usize>,
+        english_name: &str,
+    ) -> Option<usize> {
         let lower = english_name.to_lowercase();
 
         if let Some(&idx) = header_map.get(&lower) {
@@ -109,22 +112,64 @@ impl GooglePlace {
 
     pub fn from_geojson_feature(feature: &serde_json::Value) -> Self {
         let empty_map = serde_json::Map::new();
-        let properties = feature.get("properties").and_then(|v| v.as_object()).unwrap_or(&empty_map);
+        let properties = feature
+            .get("properties")
+            .and_then(|v| v.as_object())
+            .unwrap_or(&empty_map);
 
         GooglePlace {
-            title: properties.get("Title").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            notes: properties.get("Notes").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            url: properties.get("URL").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            tags: properties.get("Tags").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            comments: properties.get("Comments").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            latitude: properties.get("Latitude").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            longitude: properties.get("Longitude").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            place_name: properties.get("Place Name").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            rating: properties.get("Rating").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            website: properties.get("Website").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            description: properties.get("Description").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            original_name: properties.get("Original Name").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            english_name: properties.get("English Name").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            title: properties
+                .get("Title")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            notes: properties
+                .get("Notes")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            url: properties
+                .get("URL")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            tags: properties
+                .get("Tags")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            comments: properties
+                .get("Comments")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            latitude: properties
+                .get("Latitude")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            longitude: properties
+                .get("Longitude")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            place_name: properties
+                .get("Place Name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            rating: properties
+                .get("Rating")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            website: properties
+                .get("Website")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            description: properties
+                .get("Description")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            original_name: properties
+                .get("Original Name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            english_name: properties
+                .get("English Name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
         }
     }
 }
@@ -167,6 +212,8 @@ pub fn parse_takeout(path: &str) -> Result<Vec<GooglePlace>> {
 
             Ok(places)
         }
-        _ => Err(anyhow!("Unsupported file format. Expected .csv, .json, or .geojson")),
+        _ => Err(anyhow!(
+            "Unsupported file format. Expected .csv, .json, or .geojson"
+        )),
     }
 }
