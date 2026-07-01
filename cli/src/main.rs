@@ -63,10 +63,9 @@ async fn main() -> Result<()> {
                 id
             }
             Err(_) => {
-                let layer_id = client
+                client
                     .create_and_upload_layer(&map_id, &args.layer_name, &feature_collection, auth)
-                    .await?;
-                layer_id
+                    .await?
             }
         };
 

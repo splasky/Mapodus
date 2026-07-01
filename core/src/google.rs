@@ -52,10 +52,10 @@ impl GooglePlace {
         ];
 
         for (cn, en) in chinese_map {
-            if *en == lower || *en == english_name.to_lowercase() {
-                if let Some(&idx) = header_map.get(&cn.to_string()) {
-                    return Some(idx);
-                }
+            if (*en == lower || *en == english_name.to_lowercase())
+                && let Some(&idx) = header_map.get(&cn.to_string())
+            {
+                return Some(idx);
             }
         }
 

@@ -219,16 +219,14 @@ impl UmapClient {
         if let Some(datalayers) = geojson_data
             .get("properties")
             .and_then(|p| p.get("datalayers"))
+            && let Some(layers) = datalayers.as_array()
         {
-            if let Some(layers) = datalayers.as_array() {
-                for layer in layers {
-                    if let Some(name) = layer.get("name").and_then(|n| n.as_str()) {
-                        if name == layer_name {
-                            if let Some(id) = layer_id_to_string(layer.get("id")) {
-                                return Ok(Some(id));
-                            }
-                        }
-                    }
+            for layer in layers {
+                if let Some(name) = layer.get("name").and_then(|n| n.as_str())
+                    && name == layer_name
+                    && let Some(id) = layer_id_to_string(layer.get("id"))
+                {
+                    return Ok(Some(id));
                 }
             }
         }

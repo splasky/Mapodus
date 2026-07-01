@@ -201,46 +201,46 @@ impl Converter {
                     desc_lines.push(format!("名稱: {}", t));
                 }
 
-                if let Some(eng) = &place.english_name {
-                    if !eng.is_empty() {
-                        desc_lines.push(format!("English: {}", eng));
-                    }
+                if let Some(eng) = &place.english_name
+                    && !eng.is_empty()
+                {
+                    desc_lines.push(format!("English: {}", eng));
                 }
 
-                if let Some(url) = &place.url {
-                    if !url.is_empty() {
-                        desc_lines.push(format!("Google Maps: {}", url));
-                    }
+                if let Some(url) = &place.url
+                    && !url.is_empty()
+                {
+                    desc_lines.push(format!("Google Maps: {}", url));
                 }
 
-                if let Some(rating) = &place.rating {
-                    if !rating.is_empty() {
-                        desc_lines.push(format!("Rating: {}", rating));
-                    }
+                if let Some(rating) = &place.rating
+                    && !rating.is_empty()
+                {
+                    desc_lines.push(format!("Rating: {}", rating));
                 }
 
-                if let Some(note) = &place.notes {
-                    if !note.is_empty() {
-                        desc_lines.push(format!("Note: {}", note));
-                    }
+                if let Some(note) = &place.notes
+                    && !note.is_empty()
+                {
+                    desc_lines.push(format!("Note: {}", note));
                 }
 
-                if let Some(tags) = &place.tags {
-                    if !tags.is_empty() {
-                        desc_lines.push(format!("Tags: {}", tags));
-                    }
+                if let Some(tags) = &place.tags
+                    && !tags.is_empty()
+                {
+                    desc_lines.push(format!("Tags: {}", tags));
                 }
 
-                if let Some(website) = &place.website {
-                    if !website.is_empty() {
-                        desc_lines.push(format!("Website: {}", website));
-                    }
+                if let Some(website) = &place.website
+                    && !website.is_empty()
+                {
+                    desc_lines.push(format!("Website: {}", website));
                 }
 
-                if let Some(desc) = &place.description {
-                    if !desc.is_empty() {
-                        desc_lines.push(format!("簡介: {}", desc));
-                    }
+                if let Some(desc) = &place.description
+                    && !desc.is_empty()
+                {
+                    desc_lines.push(format!("簡介: {}", desc));
                 }
 
                 properties.insert(
