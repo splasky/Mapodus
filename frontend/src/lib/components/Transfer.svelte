@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { apiPost } from '../api';
+  import { apiGet, apiPost } from '../api';
 
   let { onDone, onPrev }: { onDone: () => void; onPrev?: () => void } = $props();
   let transferring = $state(false);
@@ -14,12 +14,10 @@
     transferring = true;
     error = '';
     try {
-      // Fetch selected IDs from the bookmark list
-      const bookmarks = await (await fetch('/api/bookmarks')).json();
-      const selectedIds = Array.from(
-        { length: bookmarks.bookmarks.length },
-        (_, i) => i
-      );
+      const bookmarks = await apiGet<{ bookmarks: any[]; selected_ids: number[] }>('/bookmarks');
+      const selectedIds = bookmarks.selected_ids.length > 0
+        ? bookmarks.selected_ids
+        : bookmarks.bookmarks.map((_: any, i: number) => i);
 
       const res = await apiPost<any>('/transfer', { selected_ids: selectedIds });
       result = res;

@@ -122,6 +122,22 @@
       ✅ Uploaded {uploaded.bookmarks.length} places
     </div>
 
+    {#if uploaded.validation}
+      {#if uploaded.validation.ready === uploaded.validation.total}
+        <div class="validation-ready">
+          ✅ All {uploaded.validation.total} places have coordinates and are ready for uMap
+        </div>
+      {:else}
+        <div class="validation-warning">
+          ⚠️ {uploaded.validation.ready} of {uploaded.validation.total} places ready —
+          {uploaded.validation.missing_coords.length} missing coordinates
+          {#if uploaded.validation.missing_name.length > 0}
+            , {uploaded.validation.missing_name.length} missing title
+          {/if}
+        </div>
+      {/if}
+    {/if}
+
     <details>
       <summary
         style="cursor: pointer; color: #2563eb; font-weight: 500; margin-top: 1rem;"
@@ -249,5 +265,23 @@
   }
   .enrich-btn:disabled {
     opacity: 0.6;
+  }
+  .validation-ready {
+    background: #ecfdf5;
+    color: #065f46;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-top: 0.75rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .validation-warning {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-top: 0.75rem;
+    font-weight: 600;
+    font-size: 0.9rem;
   }
 </style>
