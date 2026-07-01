@@ -82,16 +82,16 @@ impl CliArgs {
             ));
         }
 
-        if let Some(ref path) = self.takeout {
-            if !Path::new(path).exists() {
-                return Err(anyhow::anyhow!("Takeout file does not exist: {}", path));
-            }
+        if let Some(ref path) = self.takeout
+            && !Path::new(path).exists()
+        {
+            return Err(anyhow::anyhow!("Takeout file does not exist: {}", path));
         }
 
-        if let Some(ref path) = self.geojson {
-            if !Path::new(path).exists() {
-                return Err(anyhow::anyhow!("GeoJSON file does not exist: {}", path));
-            }
+        if let Some(ref path) = self.geojson
+            && !Path::new(path).exists()
+        {
+            return Err(anyhow::anyhow!("GeoJSON file does not exist: {}", path));
         }
 
         if let Some(ref path) = self.output {

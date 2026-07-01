@@ -29,7 +29,7 @@ impl Converter {
                         "title".to_string(),
                         serde_json::Value::String(title.clone()),
                     );
-                    properties.insert("标题".to_string(), serde_json::Value::String(title.clone()));
+                    properties.insert("標題".to_string(), serde_json::Value::String(title.clone()));
                 }
 
                 if let Some(notes) = &place.notes {
@@ -37,17 +37,17 @@ impl Converter {
                         "notes".to_string(),
                         serde_json::Value::String(notes.clone()),
                     );
-                    properties.insert("笔记".to_string(), serde_json::Value::String(notes.clone()));
+                    properties.insert("筆記".to_string(), serde_json::Value::String(notes.clone()));
                 }
 
                 if let Some(url) = &place.url {
                     properties.insert("url".to_string(), serde_json::Value::String(url.clone()));
-                    properties.insert("网址".to_string(), serde_json::Value::String(url.clone()));
+                    properties.insert("網址".to_string(), serde_json::Value::String(url.clone()));
                 }
 
                 if let Some(tags) = &place.tags {
                     properties.insert("tags".to_string(), serde_json::Value::String(tags.clone()));
-                    properties.insert("标签".to_string(), serde_json::Value::String(tags.clone()));
+                    properties.insert("標籤".to_string(), serde_json::Value::String(tags.clone()));
                 }
 
                 if let Some(comments) = &place.comments {
@@ -67,7 +67,7 @@ impl Converter {
                         serde_json::Value::String(lat_str.clone()),
                     );
                     properties.insert(
-                        "纬度".to_string(),
+                        "緯度".to_string(),
                         serde_json::Value::String(lat_str.clone()),
                     );
                 }
@@ -78,7 +78,7 @@ impl Converter {
                         serde_json::Value::String(lon_str.clone()),
                     );
                     properties.insert(
-                        "经度".to_string(),
+                        "經度".to_string(),
                         serde_json::Value::String(lon_str.clone()),
                     );
                 }
@@ -89,7 +89,7 @@ impl Converter {
                         serde_json::Value::String(place_name.clone()),
                     );
                     properties.insert(
-                        "地点名称".to_string(),
+                        "地點名稱".to_string(),
                         serde_json::Value::String(place_name.clone()),
                     );
                 }
@@ -100,7 +100,7 @@ impl Converter {
                         serde_json::Value::String(rating.clone()),
                     );
                     properties.insert(
-                        "星级评分".to_string(),
+                        "星級評分".to_string(),
                         serde_json::Value::String(rating.clone()),
                     );
                 }
@@ -111,7 +111,7 @@ impl Converter {
                         serde_json::Value::String(website.clone()),
                     );
                     properties.insert(
-                        "网站".to_string(),
+                        "網站".to_string(),
                         serde_json::Value::String(website.clone()),
                     );
                 }
@@ -122,7 +122,7 @@ impl Converter {
                         serde_json::Value::String(description.clone()),
                     );
                     properties.insert(
-                        "简介".to_string(),
+                        "簡介".to_string(),
                         serde_json::Value::String(description.clone()),
                     );
                 }
@@ -133,7 +133,7 @@ impl Converter {
                         serde_json::Value::String(original_name.clone()),
                     );
                     properties.insert(
-                        "原文名称".to_string(),
+                        "原文名稱".to_string(),
                         serde_json::Value::String(original_name.clone()),
                     );
                 }
@@ -144,7 +144,7 @@ impl Converter {
                         serde_json::Value::String(english_name.clone()),
                     );
                     properties.insert(
-                        "英文名称".to_string(),
+                        "英文名稱".to_string(),
                         serde_json::Value::String(english_name.clone()),
                     );
                 }
@@ -201,46 +201,46 @@ impl Converter {
                     desc_lines.push(format!("名稱: {}", t));
                 }
 
-                if let Some(eng) = &place.english_name {
-                    if !eng.is_empty() {
-                        desc_lines.push(format!("English: {}", eng));
-                    }
+                if let Some(eng) = &place.english_name
+                    && !eng.is_empty()
+                {
+                    desc_lines.push(format!("English: {}", eng));
                 }
 
-                if let Some(url) = &place.url {
-                    if !url.is_empty() {
-                        desc_lines.push(format!("Google Maps: {}", url));
-                    }
+                if let Some(url) = &place.url
+                    && !url.is_empty()
+                {
+                    desc_lines.push(format!("Google Maps: {}", url));
                 }
 
-                if let Some(rating) = &place.rating {
-                    if !rating.is_empty() {
-                        desc_lines.push(format!("Rating: {}", rating));
-                    }
+                if let Some(rating) = &place.rating
+                    && !rating.is_empty()
+                {
+                    desc_lines.push(format!("Rating: {}", rating));
                 }
 
-                if let Some(note) = &place.notes {
-                    if !note.is_empty() {
-                        desc_lines.push(format!("Note: {}", note));
-                    }
+                if let Some(note) = &place.notes
+                    && !note.is_empty()
+                {
+                    desc_lines.push(format!("Note: {}", note));
                 }
 
-                if let Some(tags) = &place.tags {
-                    if !tags.is_empty() {
-                        desc_lines.push(format!("Tags: {}", tags));
-                    }
+                if let Some(tags) = &place.tags
+                    && !tags.is_empty()
+                {
+                    desc_lines.push(format!("Tags: {}", tags));
                 }
 
-                if let Some(website) = &place.website {
-                    if !website.is_empty() {
-                        desc_lines.push(format!("Website: {}", website));
-                    }
+                if let Some(website) = &place.website
+                    && !website.is_empty()
+                {
+                    desc_lines.push(format!("Website: {}", website));
                 }
 
-                if let Some(desc) = &place.description {
-                    if !desc.is_empty() {
-                        desc_lines.push(format!("簡介: {}", desc));
-                    }
+                if let Some(desc) = &place.description
+                    && !desc.is_empty()
+                {
+                    desc_lines.push(format!("簡介: {}", desc));
                 }
 
                 properties.insert(

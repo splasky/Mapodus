@@ -402,7 +402,7 @@ pub fn strip_xssi(data: &str) -> Option<&str> {
     } else {
         0
     };
-    Some(&data[start..].trim())
+    Some(data[start..].trim())
 }
 
 fn strip_xssi_bytes(data: &[u8]) -> Option<&str> {
@@ -511,15 +511,14 @@ fn find_saved_lists_array(root: &[serde_json::Value]) -> Option<&[serde_json::Va
             continue;
         }
         // Check first 3 are null
-        if arr[0].is_null() && arr[1].is_null() && arr[2].is_null() {
-            if let Some(entries) = arr[3].as_array() {
-                if !entries.is_empty() {
-                    // Verify at least one entry looks like a saved list
-                    if entries.iter().any(|e| looks_like_saved_list(e)) {
-                        return Some(entries);
-                    }
-                }
-            }
+        if arr[0].is_null()
+            && arr[1].is_null()
+            && arr[2].is_null()
+            && let Some(entries) = arr[3].as_array()
+            && !entries.is_empty()
+            && entries.iter().any(looks_like_saved_list)
+        {
+            return Some(entries);
         }
     }
     None
@@ -556,12 +555,12 @@ fn find_my_maps_array(root: &[serde_json::Value]) -> Option<&[serde_json::Value]
         if arr.is_empty() {
             continue;
         }
-        if arr.iter().all(|e| e.is_array()) {
-            if let Some(first) = arr.first().and_then(|v| v.as_array()) {
-                if first.len() >= 5 && first[0].is_string() {
-                    return Some(arr);
-                }
-            }
+        if arr.iter().all(|e| e.is_array())
+            && let Some(first) = arr.first().and_then(|v| v.as_array())
+            && first.len() >= 5
+            && first[0].is_string()
+        {
+            return Some(arr);
         }
     }
     None
