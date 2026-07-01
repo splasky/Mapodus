@@ -30,7 +30,7 @@ pub fn extract_coords_from_url(url: &str) -> Option<(f64, f64)> {
     if let Some(q_pos) = url.find("?q=") {
         let after_q = &url[q_pos + 3..];
         let end = after_q
-            .find(|c: char| c == '&' || c == '#')
+            .find(|c: char| ['&', '#'].contains(&c))
             .unwrap_or(after_q.len());
         let value = &after_q[..end];
         // Only parse if it doesn't look like place_id: prefix
@@ -56,7 +56,7 @@ pub fn extract_place_id_from_url(url: &str) -> Option<String> {
     if let Some(q_pos) = url.find("place_id:") {
         let after = &url[q_pos + 9..];
         let end = after
-            .find(|c: char| c == '&' || c == '#')
+            .find(|c: char| ['&', '#'].contains(&c))
             .unwrap_or(after.len());
         let id = &after[..end];
         if !id.is_empty() {
@@ -173,21 +173,19 @@ impl GooglePlace {
         set_field!(english_name, "English Name");
 
         // If lat/lng are missing, try to extract from URL
-        if place.latitude.is_none() || place.longitude.is_none() {
-            if let Some(url) = &place.url {
-                if let Some((lat, lng)) = extract_coords_from_url(url) {
-                    place.latitude = Some(lat.to_string());
-                    place.longitude = Some(lng.to_string());
-                }
-            }
+        if (place.latitude.is_none() || place.longitude.is_none())
+            && let Some(url) = &place.url
+            && let Some((lat, lng)) = extract_coords_from_url(url)
+        {
+            place.latitude = Some(lat.to_string());
+            place.longitude = Some(lng.to_string());
         }
         // Extract place_id from URL if available
-        if place.place_id.is_none() {
-            if let Some(url) = &place.url {
-                if let Some(pid) = extract_place_id_from_url(url) {
-                    place.place_id = Some(pid);
-                }
-            }
+        if place.place_id.is_none()
+            && let Some(url) = &place.url
+            && let Some(pid) = extract_place_id_from_url(url)
+        {
+            place.place_id = Some(pid);
         }
 
         place
@@ -253,6 +251,7 @@ impl GooglePlace {
                 .get("English Name")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
+            place_id: None,
         }
     }
 }
