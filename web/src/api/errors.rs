@@ -4,6 +4,7 @@ use axum::Json;
 use serde_json::json;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum ApiError {
     BadRequest(String),
     Unauthorized(String),
