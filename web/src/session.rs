@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use umap_core::google::GooglePlace;
@@ -19,6 +21,7 @@ pub struct AppSession {
     pub umap_url: Option<String>,
     pub google_places: Option<Vec<GoogleSavedPlace>>,
     pub transfer_mode: Option<String>,
+    pub google_cookies: Option<HashMap<String, String>>,
 }
 
 impl AppSession {

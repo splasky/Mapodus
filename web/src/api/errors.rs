@@ -47,3 +47,9 @@ impl From<tower_sessions::session::Error> for ApiError {
         ApiError::Internal(e.to_string())
     }
 }
+
+impl From<umap_core::error::AppError> for ApiError {
+    fn from(e: umap_core::error::AppError) -> Self {
+        ApiError::Internal(e.to_string())
+    }
+}
