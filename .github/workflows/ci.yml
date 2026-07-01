@@ -13,13 +13,13 @@ jobs:
     rust:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
 
             - name: Install nightly toolchain
               run: rustup toolchain install nightly --component clippy --component rustfmt
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v5
               with:
                   node-version: 22
                   cache: npm
@@ -53,10 +53,10 @@ jobs:
     frontend:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v5
               with:
                   node-version: 22
                   cache: npm
