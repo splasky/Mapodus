@@ -22,6 +22,13 @@ pub struct GoogleSavedList {
     pub url: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GooglePlaceDetails {
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub url: Option<String>,
+}
+
 pub struct GoogleMapsClient {
     client: reqwest::Client,
     cookies: HashMap<String, String>,
@@ -198,6 +205,42 @@ impl GoogleMapsClient {
             );
         }
         Ok(places)
+    }
+
+    /// Look up place details by place_id using the Google Maps preview/place endpoint.
+    pub async fn get_place_details(
+        &self,
+        place_id: &str,
+    ) -> Result<Option<GooglePlaceDetails>, crate::error::AppError> {
+        let pb = format!("!1s{}!2e1", place_id);
+        let url = "https://www.google.com/maps/preview/place";
+        let response = self
+            .client
+            .get(url)
+            .query(&[("authuser", "0"), ("hl", "en"), ("gl", "us"), ("pb", &pb)])
+            .headers(self.request_headers())
+            .send()
+            .await?;
+        let status = response.status();
+        let data = response.bytes().await?;
+        if !status.is_success() {
+            let preview = String::from_utf8_lossy(&data[..data.len().min(200)]);
+            return Err(crate::error::AppError::Http(format!(
+                "Place details endpoint returned {} for place_id '{}': {}",
+                status, place_id, preview
+            )));
+        }
+        let body = strip_xssi_bytes(&data).ok_or_else(|| {
+            crate::error::AppError::Parse("Place details response not valid UTF-8".into())
+        })?;
+        let json: serde_json::Value = serde_json::from_str(body).map_err(|e| {
+            let preview = &body[..body.len().min(500)];
+            crate::error::AppError::Parse(format!(
+                "Place details JSON error for '{}': {}. Body: {}",
+                place_id, e, preview
+            ))
+        })?;
+        parse_place_details(&json, place_id)
     }
 
     /// High-level: get all places from all saved lists.
@@ -631,6 +674,90 @@ fn parse_getlist_places(
     }
 
     Ok(places)
+}
+
+/// Parse the preview/place response to extract details for a single place.
+fn parse_place_details(
+    value: &serde_json::Value,
+    place_id: &str,
+) -> Result<Option<GooglePlaceDetails>, crate::error::AppError> {
+    let root = match value.as_array() {
+        Some(a) => a,
+        None => {
+            eprintln!("[place_details] Root is not an array for place_id '{}'", place_id);
+            return Ok(None);
+        }
+    };
+
+    // Walk into the response to find the place data.
+    // Structure is typically:
+    //   [..., [place_entry, ...], ...]
+    // where place_entry[2] = name, place_entry[1] contains location data.
+    let entry = root.iter().find_map(|elem| {
+        let arr = elem.as_array()?;
+        // Look for an element whose child has the place_id
+        find_place_entry_in_array(arr, place_id)
+    });
+
+    match entry {
+        Some(entry_arr) => {
+            let place_info = entry_arr.get(1).and_then(|v| v.as_array());
+            let coords = place_info
+                .and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
+            let latitude = coords.and_then(|c| c.get(2).and_then(|v| v.as_f64()));
+            let longitude = coords.and_then(|c| c.get(3).and_then(|v| v.as_f64()));
+            let pid = place_info
+                .and_then(|pi| pi.get(7).and_then(|v| v.as_str()));
+            let url = pid.map(|id| format!("https://www.google.com/maps/place/?q=place_id:{}", id));
+
+            if latitude.is_some() || longitude.is_some() {
+                eprintln!(
+                    "[place_details] Found coords for place_id '{}': {:?}, {:?}",
+                    place_id, latitude, longitude
+                );
+                Ok(Some(GooglePlaceDetails {
+                    latitude,
+                    longitude,
+                    url,
+                }))
+            } else {
+                eprintln!(
+                    "[place_details] No coords found for place_id '{}'",
+                    place_id
+                );
+                Ok(None)
+            }
+        }
+        None => {
+            eprintln!(
+                "[place_details] No entry found for place_id '{}'",
+                place_id
+            );
+            Ok(None)
+        }
+    }
+}
+
+fn find_place_entry_in_array<'a>(
+    arr: &'a [serde_json::Value],
+    place_id: &str,
+) -> Option<&'a [serde_json::Value]> {
+    for elem in arr {
+        if let Some(inner) = elem.as_array() {
+            // Check if this entry has place_id at [1][7]
+            if let Some(pi) = inner.get(1).and_then(|v| v.as_array())
+                && let Some(pid) = pi.get(7).and_then(|v| v.as_str())
+                && pid == place_id
+            {
+                return Some(inner);
+            }
+            // Recurse deeper
+            if let Some(found) = find_place_entry_in_array(inner, place_id) {
+                return Some(found);
+            }
+        }
+    }
+    None
 }
 
 // ── MD5 (no external dependency) ──

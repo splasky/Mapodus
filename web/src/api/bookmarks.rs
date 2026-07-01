@@ -6,6 +6,7 @@ use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use umap_core::google::{GooglePlace, extract_coords_from_url, parse_takeout};
+use umap_core::google_maps_api::GoogleMapsClient;
 
 use crate::api::errors::ApiError;
 use crate::session::AppSession;
@@ -74,7 +75,6 @@ pub async fn list(session: Session) -> Result<impl IntoResponse, ApiError> {
 }
 
 #[derive(Deserialize)]
-#[allow(dead_code)]
 pub struct EnrichRequest {
     cookies: HashMap<String, String>,
 }
@@ -88,7 +88,7 @@ pub struct EnrichResponse {
 
 pub async fn enrich(
     session: Session,
-    Json(_req): Json<EnrichRequest>,
+    Json(req): Json<EnrichRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let mut app = AppSession::from_session(&session).await;
     let bookmarks = app
@@ -96,6 +96,7 @@ pub async fn enrich(
         .take()
         .ok_or_else(|| ApiError::BadRequest("No bookmarks in session. Upload first.".into()))?;
 
+    let client = GoogleMapsClient::new(req.cookies);
     let mut enriched = 0usize;
     let mut skipped = 0usize;
 
@@ -113,7 +114,34 @@ pub async fn enrich(
             continue;
         }
 
-        skipped += 1;
+        // If we have a place_id and still need coords, call Google Maps API
+        if (place.latitude.is_none() || place.longitude.is_none())
+            && let Some(pid) = &place.place_id
+        {
+            match client.get_place_details(pid).await {
+                Ok(Some(details)) => {
+                    if place.latitude.is_none() {
+                        place.latitude = details.latitude.map(|v| v.to_string());
+                    }
+                    if place.longitude.is_none() {
+                        place.longitude = details.longitude.map(|v| v.to_string());
+                    }
+                    if place.url.is_none() {
+                        place.url = details.url;
+                    }
+                    enriched += 1;
+                }
+                Ok(None) => {
+                    skipped += 1;
+                }
+                Err(e) => {
+                    eprintln!("[enrich] API error for place_id={}: {}", pid, e);
+                    skipped += 1;
+                }
+            }
+        } else {
+            skipped += 1;
+        }
         updated.push(place);
     }
 
