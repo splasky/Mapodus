@@ -3,6 +3,69 @@ use csv;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
+/// Extract coordinates from a Google Maps URL.
+/// Handles formats:
+///   - `https://maps.google.com/?q=lat,lng`
+///   - `https://www.google.com/maps/place/Name/@lat,lng,zoom`
+///   - `https://www.google.com/maps/place/?q=place_id:XYZ` (no coords)
+pub fn extract_coords_from_url(url: &str) -> Option<(f64, f64)> {
+    // Pattern: @lat,lng or @lat,lng,zoom in the path
+    if let Some(at_pos) = url.find('@') {
+        let after_at = &url[at_pos + 1..];
+        let end = after_at
+            .find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-' && c != ',')
+            .unwrap_or(after_at.len());
+        let coords = &after_at[..end];
+        let parts: Vec<&str> = coords.split(',').collect();
+        if parts.len() >= 2 {
+            let lat = parts[0].parse::<f64>().ok()?;
+            let lng = parts[1].parse::<f64>().ok()?;
+            if lat.is_finite() && lng.is_finite() {
+                return Some((lat, lng));
+            }
+        }
+    }
+
+    // Pattern: ?q=lat,lng in query string
+    if let Some(q_pos) = url.find("?q=") {
+        let after_q = &url[q_pos + 3..];
+        let end = after_q
+            .find(|c: char| c == '&' || c == '#')
+            .unwrap_or(after_q.len());
+        let value = &after_q[..end];
+        // Only parse if it doesn't look like place_id: prefix
+        if !value.starts_with("place_id:") {
+            let parts: Vec<&str> = value.split(',').collect();
+            if parts.len() >= 2 {
+                let lat = parts[0].parse::<f64>().ok()?;
+                let lng = parts[1].parse::<f64>().ok()?;
+                if lat.is_finite() && lng.is_finite() {
+                    return Some((lat, lng));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Extract a Google Maps place ID from a URL.
+/// Format: `https://www.google.com/maps/place/?q=place_id:ChIJ...`
+pub fn extract_place_id_from_url(url: &str) -> Option<String> {
+    // Pattern: place_id:XYZ in query string
+    if let Some(q_pos) = url.find("place_id:") {
+        let after = &url[q_pos + 9..];
+        let end = after
+            .find(|c: char| c == '&' || c == '#')
+            .unwrap_or(after.len());
+        let id = &after[..end];
+        if !id.is_empty() {
+            return Some(id.to_string());
+        }
+    }
+    None
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GooglePlace {
     pub title: Option<String>,
@@ -18,6 +81,7 @@ pub struct GooglePlace {
     pub description: Option<String>,
     pub original_name: Option<String>,
     pub english_name: Option<String>,
+    pub place_id: Option<String>,
 }
 
 impl GooglePlace {
@@ -77,6 +141,7 @@ impl GooglePlace {
             description: None,
             original_name: None,
             english_name: None,
+            place_id: None,
         };
 
         let header_map = headers
@@ -106,6 +171,24 @@ impl GooglePlace {
         set_field!(description, "Description");
         set_field!(original_name, "Original Name");
         set_field!(english_name, "English Name");
+
+        // If lat/lng are missing, try to extract from URL
+        if place.latitude.is_none() || place.longitude.is_none() {
+            if let Some(url) = &place.url {
+                if let Some((lat, lng)) = extract_coords_from_url(url) {
+                    place.latitude = Some(lat.to_string());
+                    place.longitude = Some(lng.to_string());
+                }
+            }
+        }
+        // Extract place_id from URL if available
+        if place.place_id.is_none() {
+            if let Some(url) = &place.url {
+                if let Some(pid) = extract_place_id_from_url(url) {
+                    place.place_id = Some(pid);
+                }
+            }
+        }
 
         place
     }

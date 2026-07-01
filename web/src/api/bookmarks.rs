@@ -1,9 +1,12 @@
+use std::collections::HashMap;
 use axum::Json;
+
 use axum::extract::Multipart;
 use axum::response::IntoResponse;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
-use umap_core::google::{GooglePlace, parse_takeout};
+use umap_core::google::{GooglePlace, parse_takeout, extract_coords_from_url};
+use umap_core::google_maps_api::GoogleMapsClient;
 
 use crate::api::errors::ApiError;
 use crate::session::AppSession;
@@ -68,5 +71,87 @@ pub async fn list(session: Session) -> Result<impl IntoResponse, ApiError> {
     Ok(Json(BookmarkList {
         bookmarks,
         selected_ids,
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct EnrichRequest {
+    cookies: HashMap<String, String>,
+}
+
+#[derive(Serialize)]
+pub struct EnrichResponse {
+    enriched: usize,
+    skipped: usize,
+    bookmarks: Vec<GooglePlace>,
+}
+
+pub async fn enrich(
+    session: Session,
+    Json(req): Json<EnrichRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    let mut app = AppSession::from_session(&session).await;
+    let bookmarks = app
+        .bookmarks
+        .take()
+        .ok_or_else(|| ApiError::BadRequest("No bookmarks in session. Upload first.".into()))?;
+
+    let client = GoogleMapsClient::new(req.cookies);
+    let mut enriched = 0usize;
+    let mut skipped = 0usize;
+
+    let mut updated: Vec<GooglePlace> = Vec::with_capacity(bookmarks.len());
+    for mut place in bookmarks {
+        // Try URL-based extraction first (always works, no cookies needed)
+        if (place.latitude.is_none() || place.longitude.is_none()) && place.place_id.is_none() {
+            if let Some(url) = &place.url {
+                if let Some((lat, lng)) = extract_coords_from_url(url) {
+                    place.latitude = Some(lat.to_string());
+                    place.longitude = Some(lng.to_string());
+                }
+            }
+        }
+
+        // If we have a place_id and still need more info, call Google Maps API
+        if let Some(pid) = place.place_id.clone() {
+            let needs_enrich = place.latitude.is_none()
+                || place.longitude.is_none()
+                || place.notes.is_none();
+            if needs_enrich {
+                match client.get_place_details(&pid).await {
+                    Ok(Some(details)) => {
+                        if place.latitude.is_none() {
+                            place.latitude = details.latitude.map(|v| v.to_string());
+                        }
+                        if place.longitude.is_none() {
+                            place.longitude = details.longitude.map(|v| v.to_string());
+                        }
+                        if place.url.is_none() {
+                            place.url = details.url;
+                        }
+                        enriched += 1;
+                    }
+                    Ok(None) => {
+                        skipped += 1;
+                    }
+                    Err(e) => {
+                        eprintln!("[enrich] API error for place_id={}: {}", pid, e);
+                        skipped += 1;
+                    }
+                }
+            }
+        } else {
+            skipped += 1;
+        }
+        updated.push(place);
+    }
+
+    app.bookmarks = Some(updated.clone());
+    app.save_to_session(&session).await;
+
+    Ok(Json(EnrichResponse {
+        enriched,
+        skipped,
+        bookmarks: updated,
     }))
 }

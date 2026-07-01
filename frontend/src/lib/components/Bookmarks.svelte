@@ -74,7 +74,12 @@
       {#each bookmarks as bookmark, i}
         <div class="bookmark-row">
           <input type="checkbox" checked={selected.has(i)} onchange={() => toggle(i)} />
-          <span>{bookmark.title || bookmark.place_name || 'Untitled'}</span>
+          <span class="bk-title">{bookmark.title || bookmark.place_name || 'Untitled'}</span>
+          {#if bookmark.latitude && bookmark.longitude}
+            <span class="bk-has-coords" title="Has coordinates">📍</span>
+          {:else}
+            <span class="bk-no-coords" title="Missing coordinates">⚠️</span>
+          {/if}
         </div>
       {/each}
     </div>

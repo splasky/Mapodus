@@ -19,6 +19,7 @@ pub fn routes() -> Router {
             axum::routing::post(bookmarks::upload),
         )
         .route("/api/bookmarks", axum::routing::get(bookmarks::list))
+        .route("/api/bookmarks/enrich", axum::routing::post(bookmarks::enrich))
         .route("/api/umap/connect", axum::routing::post(umap::connect))
         .route("/api/umap/status", axum::routing::get(umap::status))
         .route("/api/transfer", axum::routing::post(umap::transfer))
