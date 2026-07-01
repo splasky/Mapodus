@@ -253,7 +253,8 @@ impl Converter {
                 macro_rules! set_prop {
                     ($en:expr, $val:expr) => {
                         let v = $val.as_deref().unwrap_or("");
-                        properties.insert($en.to_string(), serde_json::Value::String(v.to_string()));
+                        properties
+                            .insert($en.to_string(), serde_json::Value::String(v.to_string()));
                     };
                 }
                 set_prop!("title", place.title);
@@ -338,8 +339,18 @@ mod tests {
         let props = fc.features[0].properties.as_ref().unwrap();
 
         let english_keys = [
-            "title", "notes", "url", "tags", "comments", "latitude", "longitude",
-            "place_name", "rating", "website", "original_name", "english_name",
+            "title",
+            "notes",
+            "url",
+            "tags",
+            "comments",
+            "latitude",
+            "longitude",
+            "place_name",
+            "rating",
+            "website",
+            "original_name",
+            "english_name",
         ];
         for key in &english_keys {
             assert!(props.contains_key(*key), "Missing key: {}", key);
@@ -351,10 +362,22 @@ mod tests {
         }
 
         // Fields that were Some
-        assert_eq!(props.get("title").and_then(|v| v.as_str()), Some("Test Place"));
-        assert_eq!(props.get("url").and_then(|v| v.as_str()), Some("https://maps.google.com/"));
-        assert_eq!(props.get("latitude").and_then(|v| v.as_str()), Some("25.033"));
-        assert_eq!(props.get("longitude").and_then(|v| v.as_str()), Some("121.565"));
+        assert_eq!(
+            props.get("title").and_then(|v| v.as_str()),
+            Some("Test Place")
+        );
+        assert_eq!(
+            props.get("url").and_then(|v| v.as_str()),
+            Some("https://maps.google.com/")
+        );
+        assert_eq!(
+            props.get("latitude").and_then(|v| v.as_str()),
+            Some("25.033")
+        );
+        assert_eq!(
+            props.get("longitude").and_then(|v| v.as_str()),
+            Some("121.565")
+        );
 
         // Fields that were None → empty strings
         assert_eq!(props.get("notes").and_then(|v| v.as_str()), Some(""));
@@ -363,7 +386,10 @@ mod tests {
         assert_eq!(props.get("place_name").and_then(|v| v.as_str()), Some(""));
         assert_eq!(props.get("rating").and_then(|v| v.as_str()), Some(""));
         assert_eq!(props.get("website").and_then(|v| v.as_str()), Some(""));
-        assert_eq!(props.get("original_name").and_then(|v| v.as_str()), Some(""));
+        assert_eq!(
+            props.get("original_name").and_then(|v| v.as_str()),
+            Some("")
+        );
         assert_eq!(props.get("english_name").and_then(|v| v.as_str()), Some(""));
     }
 

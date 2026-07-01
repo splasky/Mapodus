@@ -7,7 +7,9 @@ use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use umap_core::google::{GooglePlace, extract_coords_from_url, parse_takeout};
-use umap_core::google_maps_api::{GoogleMapsClient, GooglePlaceDetails, find_place_entry_in_array, resolve_place_url_coords};
+use umap_core::google_maps_api::{
+    GoogleMapsClient, GooglePlaceDetails, find_place_entry_in_array, resolve_place_url_coords,
+};
 
 use crate::api::errors::ApiError;
 use crate::session::AppSession;
@@ -98,7 +100,10 @@ pub async fn upload(
             && let Some(url) = &place.url
             && let Some((lat, lng)) = resolve_place_url_coords(url).await
         {
-            eprintln!("[upload] Resolved coords from URL redirect: {:.6},{:.6}", lat, lng);
+            eprintln!(
+                "[upload] Resolved coords from URL redirect: {:.6},{:.6}",
+                lat, lng
+            );
             place.latitude = Some(lat.to_string());
             place.longitude = Some(lng.to_string());
         }
@@ -232,9 +237,7 @@ pub async fn enrich(
     }))
 }
 
-pub async fn auto_enrich(
-    session: Session,
-) -> Result<impl IntoResponse, ApiError> {
+pub async fn auto_enrich(session: Session) -> Result<impl IntoResponse, ApiError> {
     let mut app = AppSession::from_session(&session).await;
     let bookmarks = app
         .bookmarks
@@ -332,10 +335,7 @@ pub async fn debug_place_details(
         .await?
         .unwrap_or(serde_json::Value::Null);
 
-    let parsed = parse_place_details_direct(
-        &raw,
-        &params.place_id,
-    );
+    let parsed = parse_place_details_direct(&raw, &params.place_id);
     let entry = find_place_entry_debug(&raw, &params.place_id);
 
     Ok(Json(DebugPlaceDetailsResponse {
@@ -345,24 +345,23 @@ pub async fn debug_place_details(
     }))
 }
 
-fn parse_place_details_direct(
-    value: &serde_json::Value,
-    place_id: &str,
-) -> GooglePlaceDetails {
+fn parse_place_details_direct(value: &serde_json::Value, place_id: &str) -> GooglePlaceDetails {
     use umap_core::google_maps_api::GooglePlaceDetails;
     let root = match value.as_array() {
         Some(a) => a,
-        None => return GooglePlaceDetails {
-            latitude: None,
-            longitude: None,
-            url: None,
-            place_name: None,
-            rating: None,
-            website: None,
-            description: None,
-            original_name: None,
-            english_name: None,
-        },
+        None => {
+            return GooglePlaceDetails {
+                latitude: None,
+                longitude: None,
+                url: None,
+                place_name: None,
+                rating: None,
+                website: None,
+                description: None,
+                original_name: None,
+                english_name: None,
+            };
+        }
     };
     let entry = root.iter().find_map(|elem| {
         let arr = elem.as_array()?;
@@ -371,14 +370,15 @@ fn parse_place_details_direct(
     match entry {
         Some(entry_arr) => {
             let place_info = entry_arr.get(1).and_then(|v| v.as_array());
-            let coords = place_info
-                .and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
+            let coords = place_info.and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
             let latitude = coords.and_then(|c| c.get(2).and_then(|v| v.as_f64()));
             let longitude = coords.and_then(|c| c.get(3).and_then(|v| v.as_f64()));
-            let pid = place_info
-                .and_then(|pi| pi.get(7).and_then(|v| v.as_str()));
+            let pid = place_info.and_then(|pi| pi.get(7).and_then(|v| v.as_str()));
             let url = pid.map(|id| format!("https://www.google.com/maps/place/?q=place_id:{}", id));
-            let place_name = entry_arr.get(2).and_then(|v| v.as_str()).map(|s| s.to_string());
+            let place_name = entry_arr
+                .get(2)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
             GooglePlaceDetails {
                 latitude,
@@ -406,10 +406,7 @@ fn parse_place_details_direct(
     }
 }
 
-fn find_place_entry_debug(
-    value: &serde_json::Value,
-    place_id: &str,
-) -> Option<serde_json::Value> {
+fn find_place_entry_debug(value: &serde_json::Value, place_id: &str) -> Option<serde_json::Value> {
     let root = value.as_array()?;
     root.iter().find_map(|elem| {
         let arr = elem.as_array()?;
@@ -417,5 +414,3 @@ fn find_place_entry_debug(
         Some(elem.clone())
     })
 }
-
-

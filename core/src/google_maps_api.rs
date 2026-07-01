@@ -759,7 +759,10 @@ fn parse_place_details(
     let root = match value.as_array() {
         Some(a) => a,
         None => {
-            eprintln!("[place_details] Root is not an array for place_id '{}'", place_id);
+            eprintln!(
+                "[place_details] Root is not an array for place_id '{}'",
+                place_id
+            );
             return Ok(None);
         }
     };
@@ -777,14 +780,15 @@ fn parse_place_details(
     match entry {
         Some(entry_arr) => {
             let place_info = entry_arr.get(1).and_then(|v| v.as_array());
-            let coords = place_info
-                .and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
+            let coords = place_info.and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
             let latitude = coords.and_then(|c| c.get(2).and_then(|v| v.as_f64()));
             let longitude = coords.and_then(|c| c.get(3).and_then(|v| v.as_f64()));
-            let pid = place_info
-                .and_then(|pi| pi.get(7).and_then(|v| v.as_str()));
+            let pid = place_info.and_then(|pi| pi.get(7).and_then(|v| v.as_str()));
             let url = pid.map(|id| format!("https://www.google.com/maps/place/?q=place_id:{}", id));
-            let place_name = entry_arr.get(2).and_then(|v| v.as_str()).map(|s| s.to_string());
+            let place_name = entry_arr
+                .get(2)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
             // DEBUG: dump the full entry structure to discover available fields
             eprintln!(
@@ -818,10 +822,7 @@ fn parse_place_details(
             }
         }
         None => {
-            eprintln!(
-                "[place_details] No entry found for place_id '{}'",
-                place_id
-            );
+            eprintln!("[place_details] No entry found for place_id '{}'", place_id);
             Ok(None)
         }
     }
@@ -989,7 +990,10 @@ mod tests {
         // Google Maps URL for 新豐車站 (from test.csv)
         let url = "https://www.google.com/maps/place/%E6%96%B0%E8%B1%90%E8%BB%8A%E7%AB%99/data=!4m2!3m1!1s0x346831505ce20595:0x1d13efe96c43c466";
         let result = resolve_place_url_coords(url).await;
-        assert!(result.is_some(), "resolve_place_url_coords should return Some for a valid place URL");
+        assert!(
+            result.is_some(),
+            "resolve_place_url_coords should return Some for a valid place URL"
+        );
         let (lat, lng) = result.unwrap();
         // 新豐車站 is in Hsinchu County, Taiwan (~24.87, ~120.996)
         assert!(
@@ -1038,25 +1042,36 @@ mod tests {
     ///   [2]      = place name
     fn mock_place_response(place_id: &str, lat: f64, lng: f64, name: &str) -> serde_json::Value {
         serde_json::json!([
-            null,   // outer[0] — filler
-            [       // outer[1] — the entry
-                null,                                       // [0]
-                [                                           // [1] = place_info
-                    null, null, null, null, null,
-                    [null, null, lat, lng, null],           // [5] = coords
+            null, // outer[0] — filler
+            [
+                // outer[1] — the entry
+                null, // [0]
+                [
+                    // [1] = place_info
                     null,
-                    place_id,                               // [7] = place_id
+                    null,
+                    null,
+                    null,
+                    null,
+                    [null, null, lat, lng, null], // [5] = coords
+                    null,
+                    place_id, // [7] = place_id
                 ],
-                name,                                       // [2] = place name
+                name, // [2] = place name
             ],
-            null,   // outer[2] — filler
+            null, // outer[2] — filler
         ])
     }
 
     #[test]
     fn test_parse_place_details_found() {
         let place_id = "0x346835e9aa147b0b:0x8e09cb932ab96f34";
-        let response = mock_place_response(place_id, 24.7994433, 120.9730098, "六扇門時尚湯鍋 新竹東南店");
+        let response = mock_place_response(
+            place_id,
+            24.7994433,
+            120.9730098,
+            "六扇門時尚湯鍋 新竹東南店",
+        );
 
         let result = parse_place_details(&response, place_id).unwrap();
         assert!(result.is_some(), "Should find the entry for known place_id");
@@ -1070,15 +1085,31 @@ mod tests {
         );
         assert_eq!(
             details.url.as_deref(),
-            Some(format!("https://www.google.com/maps/place/?q=place_id:{}", place_id)).as_deref()
+            Some(format!(
+                "https://www.google.com/maps/place/?q=place_id:{}",
+                place_id
+            ))
+            .as_deref()
         );
 
         // These fields are not yet parsed from the mock — verify they're None
-        assert!(details.rating.is_none(), "rating not yet parsed from API response");
-        assert!(details.website.is_none(), "website not yet parsed from API response");
+        assert!(
+            details.rating.is_none(),
+            "rating not yet parsed from API response"
+        );
+        assert!(
+            details.website.is_none(),
+            "website not yet parsed from API response"
+        );
         assert!(details.description.is_none(), "description not yet parsed");
-        assert!(details.original_name.is_none(), "original_name not yet parsed");
-        assert!(details.english_name.is_none(), "english_name not yet parsed");
+        assert!(
+            details.original_name.is_none(),
+            "original_name not yet parsed"
+        );
+        assert!(
+            details.english_name.is_none(),
+            "english_name not yet parsed"
+        );
     }
 
     #[test]
@@ -1103,7 +1134,10 @@ mod tests {
         ]);
 
         let result = parse_place_details(&response, place_id).unwrap();
-        assert!(result.is_none(), "Should return None when no coords in entry");
+        assert!(
+            result.is_none(),
+            "Should return None when no coords in entry"
+        );
     }
 
     #[test]
@@ -1112,17 +1146,26 @@ mod tests {
         let place_id = "0xnested";
         let inner_entry = serde_json::json!([
             null,
-            [null, null, null, null, null, [null, null, 24.8, 121.0, null], null, place_id],
+            [
+                null,
+                null,
+                null,
+                null,
+                null,
+                [null, null, 24.8, 121.0, null],
+                null,
+                place_id
+            ],
             "Nested Place",
         ]);
-        let response = serde_json::json!([
-            null,
-            [null, [null, null, inner_entry, null], null],
-            null,
-        ]);
+        let response =
+            serde_json::json!([null, [null, [null, null, inner_entry, null], null], null,]);
 
         let result = parse_place_details(&response, place_id).unwrap();
-        assert!(result.is_some(), "Should find entry even when nested deeply");
+        assert!(
+            result.is_some(),
+            "Should find entry even when nested deeply"
+        );
         let details = result.unwrap();
         assert_eq!(details.latitude, Some(24.8));
         assert_eq!(details.longitude, Some(121.0));
@@ -1148,36 +1191,45 @@ mod tests {
         // Construct the array manually (not via json! macro) to avoid nesting issues
         let entry: serde_json::Value = serde_json::json!([
             null,
-            [null, null, null, null, null, [null, null, 10.0, 20.0, null], null, place_id],
+            [
+                null,
+                null,
+                null,
+                null,
+                null,
+                [null, null, 10.0, 20.0, null],
+                null,
+                place_id
+            ],
             "Direct",
         ]);
-        let arr: Vec<serde_json::Value> = vec![
-            serde_json::Value::Null,
-            entry,
-            serde_json::Value::Null,
-        ];
+        let arr: Vec<serde_json::Value> =
+            vec![serde_json::Value::Null, entry, serde_json::Value::Null];
 
         let found = find_place_entry_in_array(&arr, place_id);
         assert!(found.is_some(), "Should find direct entry");
         let found_arr = found.unwrap();
-        assert_eq!(
-            found_arr.get(2).and_then(|v| v.as_str()),
-            Some("Direct")
-        );
+        assert_eq!(found_arr.get(2).and_then(|v| v.as_str()), Some("Direct"));
     }
 
     #[test]
     fn test_find_place_entry_in_array_no_match() {
         let entry: serde_json::Value = serde_json::json!([
             null,
-            [null, null, null, null, null, [null, null, 10.0, 20.0, null], null, "0xother"],
+            [
+                null,
+                null,
+                null,
+                null,
+                null,
+                [null, null, 10.0, 20.0, null],
+                null,
+                "0xother"
+            ],
             "Other",
         ]);
-        let arr: Vec<serde_json::Value> = vec![
-            serde_json::Value::Null,
-            entry,
-            serde_json::Value::Null,
-        ];
+        let arr: Vec<serde_json::Value> =
+            vec![serde_json::Value::Null, entry, serde_json::Value::Null];
 
         let found = find_place_entry_in_array(&arr, "0xnonexistent");
         assert!(found.is_none(), "Should not find non-matching entry");

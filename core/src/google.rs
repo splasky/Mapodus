@@ -423,7 +423,11 @@ mod tests {
 
         let mut reader = csv::Reader::from_reader(data.as_bytes());
         let h = reader.headers().expect("headers").clone();
-        let r = reader.records().next().expect("first record").expect("valid record");
+        let r = reader
+            .records()
+            .next()
+            .expect("first record")
+            .expect("valid record");
         GooglePlace::from_csv_record(&r, &h)
     }
 
@@ -454,7 +458,10 @@ mod tests {
     fn test_from_csv_record_search_url_extracts_coords() {
         let place = parse_one(
             &["標題", "網址"],
-            &["", "https://www.google.com/maps/search/24.8583332,120.9927297"],
+            &[
+                "",
+                "https://www.google.com/maps/search/24.8583332,120.9927297",
+            ],
         );
         assert_eq!(place.latitude.as_deref(), Some("24.8583332"));
         assert_eq!(place.longitude.as_deref(), Some("120.9927297"));
@@ -504,7 +511,10 @@ mod tests {
     fn test_from_csv_record_at_url_extracts_coords() {
         let place = parse_one(
             &["標題", "網址"],
-            &["Name", "https://www.google.com/maps/place/Name/@25.033,121.565,15z"],
+            &[
+                "Name",
+                "https://www.google.com/maps/place/Name/@25.033,121.565,15z",
+            ],
         );
         assert_eq!(place.latitude.as_deref(), Some("25.033"));
         assert_eq!(place.longitude.as_deref(), Some("121.565"));
