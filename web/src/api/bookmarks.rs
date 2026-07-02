@@ -87,22 +87,10 @@ pub async fn upload(
     let tmp = std::env::temp_dir().join(format!("upload_{}.csv", uuid::Uuid::new_v4()));
     std::fs::write(&tmp, &data).map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let mut places = parse_takeout(tmp.to_str().unwrap())
+    let places = parse_takeout(tmp.to_str().unwrap())
         .map_err(|e| ApiError::BadRequest(format!("Failed to parse CSV: {}", e)))?;
 
     let _ = std::fs::remove_file(&tmp);
-
-    // Resolve coordinates from URL redirects for places that have a URL but no coords
-    for place in &mut places {
-        if (place.latitude.is_none() || place.longitude.is_none())
-            && let Some(url) = &place.url
-            && let Some((lat, lng)) = resolve_place_url_coords(url).await
-        {
-            eprintln!("[upload] Resolved coords from URL redirect: {:.6},{:.6}", lat, lng);
-            place.latitude = Some(lat.to_string());
-            place.longitude = Some(lng.to_string());
-        }
-    }
 
     let validation = compute_validation(&places);
 
