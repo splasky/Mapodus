@@ -304,4 +304,99 @@ mod tests {
         // test.csv has 4 data rows (the blank row after headers is skipped)
         assert_eq!(places.len(), 4);
     }
+
+    // ── Places API (New) live enrichment test ──
+    //
+    // Loads GOOGLE_MAP_API_KEY from the workspace .env and calls the real
+    // Places API (New) to enrich test.csv, then compares the result against
+    // the pre-recorded test_updated.csv. Requires network access and a valid,
+    // enabled API key, so it's ignored by default:
+    //   cargo test -p cli -- --include-ignored places_api
+    #[tokio::test]
+    #[ignore = "needs network access and a valid GOOGLE_MAP_API_KEY"]
+    async fn test_places_api_enrichment_matches_expected_csv() {
+        use umap_core::places_api::{PlacesApiClient, enrich_place};
+
+        let env_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(".env");
+        dotenvy::from_path(&env_path).expect("failed to load workspace .env");
+        let api_key = std::env::var("GOOGLE_MAP_API_KEY")
+            .expect("GOOGLE_MAP_API_KEY must be set in .env");
+
+        let client = PlacesApiClient::new(api_key);
+
+        let original_path = test_data_path("test.csv");
+        let expected_path = test_data_path("test_updated.csv");
+        let mut places = google::parse_takeout(&original_path).unwrap();
+        let expected = google::parse_takeout(&expected_path).unwrap();
+        assert_eq!(places.len(), expected.len());
+
+        for place in places.iter_mut() {
+            // Only rows with a title can be resolved via Text Search; the
+            // last row (bare search-URL) has no title and is enriched
+            // elsewhere via URL coordinate extraction.
+            if place.title.as_deref().unwrap_or("").is_empty() {
+                continue;
+            }
+            let ok = enrich_place(&client, place)
+                .await
+                .expect("Places API enrichment call failed");
+            assert!(ok, "expected a Places API match for '{:?}'", place.title);
+        }
+
+        for (i, (got, want)) in places.iter().zip(expected.iter()).enumerate() {
+            if want.latitude.as_deref().unwrap_or("").is_empty() {
+                continue;
+            }
+            let got_lat: f64 = got.latitude.as_ref().unwrap().parse().unwrap();
+            let got_lng: f64 = got.longitude.as_ref().unwrap().parse().unwrap();
+            let want_lat: f64 = want.latitude.as_ref().unwrap().parse().unwrap();
+            let want_lng: f64 = want.longitude.as_ref().unwrap().parse().unwrap();
+            assert!(
+                (got_lat - want_lat).abs() < 1e-3,
+                "row {i}: latitude mismatch: got {got_lat}, want {want_lat}"
+            );
+            assert!(
+                (got_lng - want_lng).abs() < 1e-3,
+                "row {i}: longitude mismatch: got {got_lng}, want {want_lng}"
+            );
+
+            if let Some(want_website) = want.website.as_deref().filter(|s| !s.is_empty()) {
+                assert_eq!(
+                    got.website.as_deref(),
+                    Some(want_website),
+                    "row {i}: website mismatch"
+                );
+            }
+
+            if let Some(want_rating) = want
+                .rating
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .and_then(|r| r.parse::<f64>().ok())
+            {
+                let got_rating: f64 = got
+                    .rating
+                    .as_ref()
+                    .expect("rating should be filled")
+                    .parse()
+                    .unwrap();
+                // Ratings drift over time on Google Maps vs. the static
+                // snapshot in test_updated.csv, so allow a small tolerance.
+                assert!(
+                    (got_rating - want_rating).abs() <= 0.3,
+                    "row {i}: rating drifted too much: got {got_rating}, want {want_rating}"
+                );
+            }
+
+            if let Some(want_english) = want.english_name.as_deref().filter(|s| !s.is_empty()) {
+                assert_eq!(
+                    got.english_name.as_deref(),
+                    Some(want_english),
+                    "row {i}: english_name mismatch"
+                );
+            }
+        }
+    }
 }
