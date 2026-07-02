@@ -2,6 +2,7 @@ mod api;
 mod session;
 
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::get;
@@ -137,7 +138,11 @@ async fn main() {
         .route("/{*path}", get(static_handler))
         .merge(api_routes)
         .layer(session_layer)
-        .layer(CorsLayer::permissive());
+        .layer(CorsLayer::permissive())
+        // Axum's default body-size limit is 2MB, which is too small for
+        // real-world Google Takeout CSV exports (can contain thousands of
+        // saved places). Raise it to 50MB for CSV/multipart uploads.
+        .layer(DefaultBodyLimit::max(50 * 1024 * 1024));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8900")
         .await
