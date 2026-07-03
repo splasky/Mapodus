@@ -285,6 +285,12 @@ impl GoogleMapsClient {
 /// `/place/NAME/@lat,lng,zoom/data=!...` which contains coordinates in the `@` pattern.
 /// This function follows the redirect and parses the final URL.
 ///
+/// Some places don't redirect at all (Google serves the page directly with a
+/// 200 response for automated/bot-like requests). In that case, fall back to
+/// parsing the coordinates out of the page's static-map preview `<meta>` tag
+/// (e.g. `.../staticmap?center=LAT%2CLNG&...`), which is present even when no
+/// redirect happens.
+///
 /// Requires no cookies or API key — just a standard HTTP GET.
 pub async fn resolve_place_url_coords(url: &str) -> Option<(f64, f64)> {
     let client = reqwest::Client::builder()
@@ -305,11 +311,44 @@ pub async fn resolve_place_url_coords(url: &str) -> Option<(f64, f64)> {
         .ok()?;
 
     let final_url = resp.url().as_str().to_string();
-    if final_url == url {
-        return None;
+
+    if final_url != url {
+        if let Some(coords) = crate::google::extract_coords_from_url(&final_url) {
+            return Some(coords);
+        }
     }
 
-    crate::google::extract_coords_from_url(&final_url)
+    // No redirect (or redirect had no usable coords) — fall back to scraping
+    // the static-map preview meta tag from the response body.
+    let body = resp.text().await.ok()?;
+    extract_coords_from_staticmap_meta(&body)
+}
+
+/// Extract coordinates from a Google Maps place page's static-map preview
+/// `<meta>` tag, e.g.:
+///   `<meta content="https://maps.google.com/maps/api/staticmap?center=24.15096675%2C120.6583296&amp;..." ...>`
+fn extract_coords_from_staticmap_meta(html: &str) -> Option<(f64, f64)> {
+    let center_pos = html.find("staticmap?")?;
+    let after = &html[center_pos..];
+    let center_key_pos = after.find("center=")?;
+    let after_center = &after[center_key_pos + "center=".len()..];
+    let end = after_center
+        .find(|c: char| c == '&' || c == '"')
+        .unwrap_or(after_center.len());
+    let raw = &after_center[..end];
+    // Value is URL-encoded (comma as %2C) and may have HTML entities decoded already.
+    let decoded = raw.replace("%2C", ",").replace("&#44;", ",");
+    let parts: Vec<&str> = decoded.split(',').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+    let lat = parts[0].trim().parse::<f64>().ok()?;
+    let lng = parts[1].trim().parse::<f64>().ok()?;
+    if lat.is_finite() && lng.is_finite() {
+        Some((lat, lng))
+    } else {
+        None
+    }
 }
 
 // ── ProtoTextWriter for Google's !-format protobuf ──
@@ -939,6 +978,25 @@ impl Md5State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_extract_coords_from_staticmap_meta_found() {
+        let html = r#"<html><head><meta content="https://maps.google.com/maps/api/staticmap?center=24.15096675%2C120.6583296&amp;zoom=13&amp;size=900x900" property="og:image"></head></html>"#;
+        let result = extract_coords_from_staticmap_meta(html);
+        assert_eq!(result, Some((24.15096675, 120.6583296)));
+    }
+
+    #[test]
+    fn test_extract_coords_from_staticmap_meta_missing() {
+        let html = "<html><head><title>No map here</title></head></html>";
+        assert_eq!(extract_coords_from_staticmap_meta(html), None);
+    }
+
+    #[test]
+    fn test_extract_coords_from_staticmap_meta_malformed_value() {
+        let html = r#"<meta content="https://maps.google.com/maps/api/staticmap?center=not-a-number&amp;zoom=13">"#;
+        assert_eq!(extract_coords_from_staticmap_meta(html), None);
+    }
 
     #[tokio::test]
     #[ignore = "needs network access — run manually with `cargo test -- --include-ignored`"]
