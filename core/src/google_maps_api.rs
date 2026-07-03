@@ -789,6 +789,41 @@ fn parse_place_details(
             let url = pid.map(|id| format!("https://www.google.com/maps/place/?q=place_id:{}", id));
             let place_name = entry_arr.get(2).and_then(|v| v.as_str()).map(|s| s.to_string());
 
+            // --- Extract rating ---
+            // Google Maps internal API places rating at place_info[14] = [null, value, ...]
+            let rating = place_info
+                .and_then(|pi| pi.get(14))
+                .and_then(|v| v.as_array())
+                .and_then(|arr| arr.iter().find_map(|v| v.as_f64()))
+                .map(|r| format!("{:.1}", r));
+
+            // --- Extract website ---
+            // Primary: place_info[16] = [website_uri] or just a string
+            let mut website = place_info
+                .and_then(|pi| pi.get(16))
+                .and_then(|v| {
+                    v.as_str().map(String::from)
+                        .or_else(|| v.as_array().and_then(|a| a.first()?.as_str().map(String::from)))
+                });
+            // Fallback: entry_arr[5] additional info array, index [7] = website
+            if website.is_none() {
+                website = entry_arr.get(5)
+                    .and_then(|v| v.as_array())
+                    .and_then(|ai| ai.get(7))
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+            }
+
+            // --- Extract description / summary ---
+            // entry_arr[8] often contains a short description/summary string
+            let description = entry_arr.get(8)
+                .and_then(|v| v.as_str())
+                .map(String::from);
+
+            // --- Extract original_name and english_name ---
+            let (original_name, english_name) =
+                extract_localized_names(place_info, entry_arr);
+
             if latitude.is_some() || longitude.is_some() {
                 eprintln!(
                     "[place_details] Found coords for place_id '{}': {:?}, {:?}",
@@ -799,18 +834,35 @@ fn parse_place_details(
                     longitude,
                     url,
                     place_name,
-                    rating: None,
-                    website: None,
-                    description: None,
-                    original_name: None,
-                    english_name: None,
+                    rating,
+                    website,
+                    description,
+                    original_name,
+                    english_name,
                 }))
             } else {
                 eprintln!(
                     "[place_details] No coords found for place_id '{}'",
                     place_id
                 );
-                Ok(None)
+                // Still return details even without coords if we have other useful data
+                if rating.is_some() || website.is_some() || description.is_some()
+                    || original_name.is_some() || english_name.is_some()
+                {
+                    Ok(Some(GooglePlaceDetails {
+                        latitude,
+                        longitude,
+                        url,
+                        place_name,
+                        rating,
+                        website,
+                        description,
+                        original_name,
+                        english_name,
+                    }))
+                } else {
+                    Ok(None)
+                }
             }
         }
         None => {
@@ -821,6 +873,144 @@ fn parse_place_details(
             Ok(None)
         }
     }
+}
+
+/// Extract localized names (original language + English) from the place entry.
+///
+/// Searches through the place_info array for sub-arrays that look like
+/// name entries: `[null, null, "Name"]` for the original name and
+/// `[null, "en", ..., "English Name"]` for the English name.
+///
+/// Known positions:
+///   - place_info[20] = localized name entries for many places
+///   - entry_arr[13]  = alternate location for some responses
+fn extract_localized_names(
+    place_info: Option<&Vec<serde_json::Value>>,
+    entry_arr: &[serde_json::Value],
+) -> (Option<String>, Option<String>) {
+    // Strategy 1: Try place_info[20] as a localized names array
+    if let Some(names_arr) = place_info.and_then(|pi| pi.get(20).and_then(|v| v.as_array())) {
+        let result = scan_localized_names_array(names_arr);
+        if result.0.is_some() || result.1.is_some() {
+            return result;
+        }
+    }
+
+    // Strategy 2: Try entry_arr[13] as a localized names array
+    if let Some(names_arr) = entry_arr.get(13).and_then(|v| v.as_array()) {
+        let result = scan_localized_names_array(names_arr);
+        if result.0.is_some() || result.1.is_some() {
+            return result;
+        }
+    }
+
+    // Strategy 3: Try entry_arr[9] for some response formats
+    if let Some(names_arr) = entry_arr.get(9).and_then(|v| v.as_array()) {
+        let result = scan_localized_names_array(names_arr);
+        if result.0.is_some() || result.1.is_some() {
+            return result;
+        }
+    }
+
+    // Strategy 4: Broad search through place_info for any sub-array
+    // that might contain name entries
+    if let Some(pi) = place_info {
+        for elem in pi.iter() {
+            if let Some(arr) = elem.as_array() {
+                let result = scan_localized_names_array(arr);
+                if result.0.is_some() && result.1.is_some() {
+                    return result;
+                }
+            }
+        }
+    }
+
+    (None, None)
+}
+
+/// Scan an array for localized name entries.
+///
+/// Pattern 1 (original name): `[null, null, "Some Name"]`
+/// Pattern 2 (english name):  `[null, "en"|null, ..., "English Name"]`
+fn scan_localized_names_array(arr: &[serde_json::Value]) -> (Option<String>, Option<String>) {
+    let mut original_name = None;
+    let mut english_name = None;
+
+    for elem in arr.iter() {
+        let entry = match elem.as_array() {
+            Some(e) => e,
+            None => continue,
+        };
+        if entry.len() < 3 {
+            continue;
+        }
+
+        // Check entry[0]: should be null for name entries
+        if !entry[0].is_null() {
+            continue;
+        }
+
+        // Collect all non-null strings from this entry
+        let strings: Vec<String> = entry
+            .iter()
+            .filter_map(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect();
+
+        if strings.is_empty() {
+            continue;
+        }
+
+        // If there's an "en" language code in the entry, it's an English name
+        let has_en = entry.iter().any(|v| v.as_str() == Some("en"));
+
+        if has_en {
+            // English name: take the last meaningful string (e.g., "en", ..., "English Name")
+            if let Some(name) = strings.iter().last() {
+                if name.len() > 1 && name != "en" {
+                    english_name = Some(name.clone());
+                }
+            }
+        } else {
+            // Original name: likely at entry[2] or the first meaningful string
+            for s in &strings {
+                if s.len() > 1 && s.chars().any(|c| c.is_ascii_alphabetic() || !c.is_ascii()) {
+                    original_name = Some(s.clone());
+                    break;
+                }
+            }
+        }
+    }
+
+    // If we only found one name and it looks original, also try to find English
+    // by scanning all entries for English patterns
+    if original_name.is_some() && english_name.is_none() {
+        for elem in arr.iter() {
+            let entry = match elem.as_array() {
+                Some(e) => e,
+                None => continue,
+            };
+            if entry.len() < 3 { continue; }
+            let has_en = entry.iter().any(|v| v.as_str() == Some("en"));
+            if has_en {
+                let strings: Vec<String> = entry
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .filter(|s| !s.is_empty() && *s != "en")
+                    .map(String::from)
+                    .collect();
+                if let Some(name) = strings.into_iter().last() {
+                    if name.len() > 1 {
+                        english_name = Some(name);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    (original_name, english_name)
 }
 
 fn find_place_entry_in_array<'a>(
@@ -1047,31 +1237,86 @@ mod tests {
 
     /// Build the full mock response (outer array containing an entry) like
     /// Google Maps internal API returns. Known positions in the entry array:
-    ///   [1]      = place_info array
+    ///   [1]      = place_info array (entry_arr[1])
     ///   [1][5]   = coords array [null, null, lat, lng, null]
     ///   [1][7]   = place_id string
+    ///   [1][14]  = rating (f64)
+    ///   [1][16]  = website URL (string)
     ///   [2]      = place name
-    fn mock_place_response(place_id: &str, lat: f64, lng: f64, name: &str) -> serde_json::Value {
+    ///   [8]      = description string
+    ///   [13]     = localized names array
+    fn mock_place_response(
+        place_id: &str,
+        lat: f64,
+        lng: f64,
+        name: &str,
+        rating: Option<f64>,
+        website: Option<&str>,
+        description: Option<&str>,
+        localized: Option<Vec<serde_json::Value>>,
+    ) -> serde_json::Value {
+        let mut place_info = vec![
+            serde_json::Value::Null, // [0]
+            serde_json::Value::Null, // [1]
+            serde_json::Value::Null, // [2]
+            serde_json::Value::Null, // [3]
+            serde_json::Value::Null, // [4]
+            serde_json::json!([null, null, lat, lng, null]), // [5] = coords
+            serde_json::Value::Null, // [6]
+            serde_json::json!(place_id), // [7]
+            serde_json::Value::Null, // [8]
+            serde_json::Value::Null, // [9]
+            serde_json::Value::Null, // [10]
+            serde_json::Value::Null, // [11]
+            serde_json::Value::Null, // [12]
+            serde_json::Value::Null, // [13]
+            if let Some(r) = rating {
+                serde_json::json!([null, r])
+            } else {
+                serde_json::Value::Null
+            },                                     // [14] = rating (array [null, value])
+            serde_json::Value::Null,               // [15]
+            if let Some(w) = website {
+                serde_json::json!(w)
+            } else {
+                serde_json::Value::Null
+            },                                     // [16] = website
+        ];
+        let mut entry: Vec<serde_json::Value> = vec![
+            serde_json::Value::Null,             // [0]
+            serde_json::Value::Array(place_info), // [1]
+            serde_json::json!(name),              // [2]
+            serde_json::Value::Null,             // [3]
+            serde_json::Value::Null,             // [4]
+            serde_json::Value::Null,             // [5]
+            serde_json::Value::Null,             // [6]
+            serde_json::Value::Null,             // [7]
+            if let Some(d) = description {
+                serde_json::json!(d)
+            } else {
+                serde_json::Value::Null
+            },                                   // [8] = description
+            serde_json::Value::Null,             // [9]
+            serde_json::Value::Null,             // [10]
+            serde_json::Value::Null,             // [11]
+            serde_json::Value::Null,             // [12]
+            if let Some(l) = localized {
+                serde_json::Value::Array(l)
+            } else {
+                serde_json::Value::Null
+            },                                   // [13] = localized names
+        ];
         serde_json::json!([
-            null,   // outer[0] — filler
-            [       // outer[1] — the entry
-                null,                                       // [0]
-                [                                           // [1] = place_info
-                    null, null, null, null, null,
-                    [null, null, lat, lng, null],           // [5] = coords
-                    null,
-                    place_id,                               // [7] = place_id
-                ],
-                name,                                       // [2] = place name
-            ],
-            null,   // outer[2] — filler
+            null,                   // outer[0]
+            serde_json::Value::Array(entry), // outer[1] = entry
+            null,                   // outer[2]
         ])
     }
 
     #[test]
-    fn test_parse_place_details_found() {
+    fn test_parse_place_details_basic() {
         let place_id = "0x346835e9aa147b0b:0x8e09cb932ab96f34";
-        let response = mock_place_response(place_id, 24.7994433, 120.9730098, "六扇門時尚湯鍋 新竹東南店");
+        let response = mock_place_response(place_id, 24.7994433, 120.9730098, "六扇門時尚湯鍋 新竹東南店", None, None, None, None);
 
         let result = parse_place_details(&response, place_id).unwrap();
         assert!(result.is_some(), "Should find the entry for known place_id");
@@ -1088,17 +1333,82 @@ mod tests {
             Some(format!("https://www.google.com/maps/place/?q=place_id:{}", place_id)).as_deref()
         );
 
-        // These fields are not yet parsed from the mock — verify they're None
-        assert!(details.rating.is_none(), "rating not yet parsed from API response");
-        assert!(details.website.is_none(), "website not yet parsed from API response");
-        assert!(details.description.is_none(), "description not yet parsed");
-        assert!(details.original_name.is_none(), "original_name not yet parsed");
-        assert!(details.english_name.is_none(), "english_name not yet parsed");
+        assert!(details.rating.is_none());
+        assert!(details.website.is_none());
+        assert!(details.description.is_none());
+        assert!(details.original_name.is_none());
+        assert!(details.english_name.is_none());
+    }
+
+    #[test]
+    fn test_parse_place_details_with_all_fields() {
+        let place_id = "0xexample:0xdeadbeef";
+        let localized = vec![
+            serde_json::json!([null, "en", null, null, null, null, null, null, null, null, "English Name"]),
+            serde_json::json!([null, null, null, null, null, null, null, null, null, null, "Original Name"]),
+        ];
+        let response = mock_place_response(
+            place_id, 25.033, 121.565, "Test Place",
+            Some(4.5), Some("https://example.com"),
+            Some("A nice place to visit"),
+            Some(localized),
+        );
+
+        let result = parse_place_details(&response, place_id).unwrap();
+        assert!(result.is_some());
+        let details = result.unwrap();
+
+        assert_eq!(details.latitude, Some(25.033));
+        assert_eq!(details.longitude, Some(121.565));
+        assert_eq!(details.place_name.as_deref(), Some("Test Place"));
+        assert_eq!(details.rating.as_deref(), Some("4.5"));
+        assert_eq!(details.website.as_deref(), Some("https://example.com"));
+        assert_eq!(details.description.as_deref(), Some("A nice place to visit"));
+        assert_eq!(details.original_name.as_deref(), Some("Original Name"));
+        assert_eq!(details.english_name.as_deref(), Some("English Name"));
+    }
+
+    #[test]
+    fn test_parse_place_details_with_rating_only() {
+        let place_id = "0xrating:0xtest";
+        let response = mock_place_response(place_id, 25.0, 121.0, "Rated Place", Some(3.8), None, None, None);
+
+        let result = parse_place_details(&response, place_id).unwrap().unwrap();
+        assert_eq!(result.rating.as_deref(), Some("3.8"));
+        assert!(result.website.is_none());
+        assert!(result.description.is_none());
+    }
+
+    #[test]
+    fn test_parse_place_details_with_website_in_entry_arr() {
+        let place_id = "0xweb:0xtest";
+        // Website can be at entry_arr[1][16] or entry_arr[5][7]
+        // Test the entry_arr[5][7] fallback
+        let mut entry: Vec<serde_json::Value> = vec![
+            serde_json::Value::Null, // [0]
+            serde_json::json!([null, null, null, null, null, [null, null, 25.0, 121.0, null], null, place_id, null, null, null, null, null, null, null, null, null]), // [1] place_info, no website at [16]
+            serde_json::json!("Place Name"), // [2]
+            serde_json::Value::Null, // [3]
+            serde_json::Value::Null, // [4]
+            serde_json::json!([null, null, null, null, null, null, null, "https://website-in-entry5.com"]), // [5] has website at [7]
+            serde_json::Value::Null, // [6]
+            serde_json::Value::Null, // [7]
+            serde_json::Value::Null, // [8]
+            serde_json::Value::Null, // [9]
+        ];
+        let response = serde_json::json!([
+            null,
+            serde_json::Value::Array(entry),
+            null,
+        ]);
+
+        let result = parse_place_details(&response, place_id).unwrap().unwrap();
+        assert_eq!(result.website.as_deref(), Some("https://website-in-entry5.com"));
     }
 
     #[test]
     fn test_parse_place_details_not_found() {
-        let response = mock_place_response("0xdifferent", 25.0, 121.0, "Other Place");
+        let response = mock_place_response("0xdifferent", 25.0, 121.0, "Other Place", None, None, None, None);
         let result = parse_place_details(&response, "0xabc123").unwrap();
         assert!(result.is_none(), "Should return None for unknown place_id");
     }

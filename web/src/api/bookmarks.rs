@@ -6,6 +6,8 @@ use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use umap_core::google::{GooglePlace, extract_coords_from_url, parse_takeout};
+use umap_core::google_maps_api::GooglePlaceDetails;
+use umap_core::places_api::PlacesApiClient;
 use umap_core::google_maps_api::{GoogleMapsClient, resolve_place_url_coords};
 
 use crate::api::errors::ApiError;
@@ -184,15 +186,7 @@ pub async fn enrich(
         {
             match client.get_place_details(pid).await {
                 Ok(Some(details)) => {
-                    if place.latitude.is_none() {
-                        place.latitude = details.latitude.map(|v| v.to_string());
-                    }
-                    if place.longitude.is_none() {
-                        place.longitude = details.longitude.map(|v| v.to_string());
-                    }
-                    if place.url.is_none() {
-                        place.url = details.url;
-                    }
+                    apply_details_to_place(&mut place, &details);
                     enriched += 1;
                 }
                 Ok(None) => {
@@ -229,11 +223,14 @@ pub async fn auto_enrich(
         .ok_or_else(|| ApiError::BadRequest("No bookmarks in session. Upload first.".into()))?;
 
     let client = app.google_cookies.clone().map(GoogleMapsClient::new);
+    let places_client = std::env::var("GOOGLE_MAP_API_KEY")
+        .ok()
+        .map(PlacesApiClient::new);
 
     let mut enriched = 0usize;
     let mut updated: Vec<GooglePlace> = Vec::with_capacity(bookmarks.len());
     for mut place in bookmarks {
-        // Try URL-based extraction (no cookies needed)
+        // Strategy 1: URL-based coordinate extraction (no API needed)
         if (place.latitude.is_none() || place.longitude.is_none())
             && let Some(url) = &place.url
             && let Some((lat, lng)) = extract_coords_from_url(url)
@@ -245,7 +242,7 @@ pub async fn auto_enrich(
             continue;
         }
 
-        // Try URL redirect resolution (no cookies needed)
+        // Strategy 2: URL redirect resolution (no API needed)
         if (place.latitude.is_none() || place.longitude.is_none())
             && let Some(url) = &place.url
             && let Some((lat, lng)) = resolve_place_url_coords(url).await
@@ -257,22 +254,65 @@ pub async fn auto_enrich(
             continue;
         }
 
-        // If we have stored cookies and a place_id, call Google Maps API
+        // Strategy 3: Google Maps internal API (cookie-based)
         if (place.latitude.is_none() || place.longitude.is_none())
             && let Some(pid) = &place.place_id
             && let Some(ref c) = client
             && let Ok(Some(details)) = c.get_place_details(pid).await
         {
-            if place.latitude.is_none() {
-                place.latitude = details.latitude.map(|v| v.to_string());
-            }
-            if place.longitude.is_none() {
-                place.longitude = details.longitude.map(|v| v.to_string());
-            }
-            if place.url.is_none() {
-                place.url = details.url;
-            }
+            apply_details_to_place(&mut place, &details);
             enriched += 1;
+            updated.push(place);
+            continue;
+        }
+
+        // Strategy 4: Official Places API (New) via Text Search (API key needed)
+        if (place.latitude.is_none() || place.longitude.is_none())
+            && let Some(ref p) = places_client
+            && let Some(title) = place.title.as_deref().filter(|t| !t.is_empty())
+        {
+            let bias = match (
+                place.latitude.as_ref().and_then(|s| s.parse::<f64>().ok()),
+                place.longitude.as_ref().and_then(|s| s.parse::<f64>().ok()),
+            ) {
+                (Some(lat), Some(lng)) => Some((lat, lng)),
+                _ => None,
+            };
+            match p.search_text(title, "zh-TW", bias).await {
+                Ok(Some(api_place)) => {
+                    if place.latitude.is_none() {
+                        place.latitude = api_place.latitude.map(|v| v.to_string());
+                    }
+                    if place.longitude.is_none() {
+                        place.longitude = api_place.longitude.map(|v| v.to_string());
+                    }
+                    if place.rating.is_none() {
+                        place.rating = api_place.rating.map(|v| format!("{:.1}", v));
+                    }
+                    if place.website.is_none() {
+                        place.website = api_place.website.clone();
+                    }
+                    if place.place_name.is_none() {
+                        place.place_name = api_place.display_name.clone();
+                    }
+                    if place.original_name.is_none() {
+                        place.original_name = api_place.display_name.clone();
+                    }
+                    if place.english_name.is_none()
+                        && let Some(id) = &api_place.id
+                    {
+                        match p.get_place_details(id, "en").await {
+                            Ok(en) => place.english_name = en.display_name,
+                            Err(e) => eprintln!("[auto_enrich] english lookup failed: {e}"),
+                        }
+                    }
+                    enriched += 1;
+                }
+                Err(e) => {
+                    eprintln!("[auto_enrich] Places API error for '{title}': {e}");
+                }
+                Ok(None) => {}
+            }
         }
 
         updated.push(place);
@@ -285,5 +325,37 @@ pub async fn auto_enrich(
         "enriched": enriched,
         "bookmarks": updated,
     })))
+}
+
+/// Apply all available fields from `GooglePlaceDetails` to a `GooglePlace`,
+/// only filling fields that are currently `None`.
+fn apply_details_to_place(place: &mut GooglePlace, details: &GooglePlaceDetails) {
+    if place.latitude.is_none() {
+        place.latitude = details.latitude.map(|v| v.to_string());
+    }
+    if place.longitude.is_none() {
+        place.longitude = details.longitude.map(|v| v.to_string());
+    }
+    if place.url.is_none() {
+        place.url = details.url.clone();
+    }
+    if place.place_name.is_none() {
+        place.place_name = details.place_name.clone();
+    }
+    if place.rating.is_none() {
+        place.rating = details.rating.clone();
+    }
+    if place.website.is_none() {
+        place.website = details.website.clone();
+    }
+    if place.description.is_none() {
+        place.description = details.description.clone();
+    }
+    if place.original_name.is_none() {
+        place.original_name = details.original_name.clone();
+    }
+    if place.english_name.is_none() {
+        place.english_name = details.english_name.clone();
+    }
 }
 
