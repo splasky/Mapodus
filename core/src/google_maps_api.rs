@@ -249,42 +249,6 @@ impl GoogleMapsClient {
         parse_place_details(&json, place_id)
     }
 
-    /// Debug: fetch place details and return the raw JSON response for inspection.
-    pub async fn debug_get_place_details(
-        &self,
-        place_id: &str,
-    ) -> Result<Option<serde_json::Value>, crate::error::AppError> {
-        let pb = format!("!1s{}!2e1", place_id);
-        let url = "https://www.google.com/maps/preview/place";
-        let response = self
-            .client
-            .get(url)
-            .query(&[("authuser", "0"), ("hl", "en"), ("gl", "us"), ("pb", &pb)])
-            .headers(self.request_headers())
-            .send()
-            .await?;
-        let status = response.status();
-        let data = response.bytes().await?;
-        if !status.is_success() {
-            let preview = String::from_utf8_lossy(&data[..data.len().min(200)]);
-            return Err(crate::error::AppError::Http(format!(
-                "Place details endpoint returned {} for place_id '{}': {}",
-                status, place_id, preview
-            )));
-        }
-        let body = strip_xssi_bytes(&data).ok_or_else(|| {
-            crate::error::AppError::Parse("Place details response not valid UTF-8".into())
-        })?;
-        let json: serde_json::Value = serde_json::from_str(body).map_err(|e| {
-            let preview = &body[..body.len().min(500)];
-            crate::error::AppError::Parse(format!(
-                "Place details JSON error for '{}': {}. Body: {}",
-                place_id, e, preview
-            ))
-        })?;
-        Ok(Some(json))
-    }
-
     /// High-level: get all places from all saved lists.
     pub async fn get_all_saved_places(
         &self,
@@ -786,13 +750,6 @@ fn parse_place_details(
             let url = pid.map(|id| format!("https://www.google.com/maps/place/?q=place_id:{}", id));
             let place_name = entry_arr.get(2).and_then(|v| v.as_str()).map(|s| s.to_string());
 
-            // DEBUG: dump the full entry structure to discover available fields
-            eprintln!(
-                "[place_details] entry_arr ({} elements): {}",
-                entry_arr.len(),
-                serde_json::to_string(entry_arr).unwrap_or_default()
-            );
-
             if latitude.is_some() || longitude.is_some() {
                 eprintln!(
                     "[place_details] Found coords for place_id '{}': {:?}, {:?}",
@@ -827,7 +784,7 @@ fn parse_place_details(
     }
 }
 
-pub fn find_place_entry_in_array<'a>(
+fn find_place_entry_in_array<'a>(
     arr: &'a [serde_json::Value],
     place_id: &str,
 ) -> Option<&'a [serde_json::Value]> {

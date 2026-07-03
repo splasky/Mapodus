@@ -44,15 +44,10 @@ pub fn routes() -> Router {
         );
 
     if std::env::var("DEV_MODE").as_deref() == Ok("true") {
-        router = router
-            .route(
-                "/api/google/debug",
-                axum::routing::post(google_import::debug_import),
-            )
-            .route(
-                "/api/bookmarks/debug_place_details",
-                axum::routing::get(bookmarks::debug_place_details),
-            );
+        router = router.route(
+            "/api/google/debug",
+            axum::routing::post(google_import::debug_import),
+        );
     }
 
     router

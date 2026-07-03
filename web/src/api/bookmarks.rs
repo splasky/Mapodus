@@ -2,12 +2,11 @@ use axum::Json;
 use std::collections::HashMap;
 
 use axum::extract::Multipart;
-use axum::extract::Query;
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use umap_core::google::{GooglePlace, extract_coords_from_url, parse_takeout};
-use umap_core::google_maps_api::{GoogleMapsClient, GooglePlaceDetails, find_place_entry_in_array, resolve_place_url_coords};
+use umap_core::google_maps_api::{GoogleMapsClient, resolve_place_url_coords};
 
 use crate::api::errors::ApiError;
 use crate::session::AppSession;
@@ -287,123 +286,4 @@ pub async fn auto_enrich(
         "bookmarks": updated,
     })))
 }
-
-#[derive(Deserialize)]
-pub struct DebugPlaceDetailsParams {
-    place_id: String,
-    cookies: String,
-}
-
-#[derive(Serialize)]
-pub struct DebugPlaceDetailsResponse {
-    raw_json: serde_json::Value,
-    parsed: GooglePlaceDetails,
-    entry: serde_json::Value,
-}
-
-pub async fn debug_place_details(
-    Query(params): Query<DebugPlaceDetailsParams>,
-) -> Result<impl IntoResponse, ApiError> {
-    let cookie_map: HashMap<String, String> = params
-        .cookies
-        .split(';')
-        .filter_map(|part| {
-            let trimmed = part.trim();
-            let eq = trimmed.find('=')?;
-            Some((trimmed[..eq].to_string(), trimmed[eq + 1..].to_string()))
-        })
-        .collect();
-
-    let client = GoogleMapsClient::new(cookie_map);
-    let raw = client
-        .debug_get_place_details(&params.place_id)
-        .await?
-        .unwrap_or(serde_json::Value::Null);
-
-    let parsed = parse_place_details_direct(
-        &raw,
-        &params.place_id,
-    );
-    let entry = find_place_entry_debug(&raw, &params.place_id);
-
-    Ok(Json(DebugPlaceDetailsResponse {
-        raw_json: raw,
-        parsed,
-        entry: entry.unwrap_or(serde_json::Value::Null),
-    }))
-}
-
-fn parse_place_details_direct(
-    value: &serde_json::Value,
-    place_id: &str,
-) -> GooglePlaceDetails {
-    use umap_core::google_maps_api::GooglePlaceDetails;
-    let root = match value.as_array() {
-        Some(a) => a,
-        None => return GooglePlaceDetails {
-            latitude: None,
-            longitude: None,
-            url: None,
-            place_name: None,
-            rating: None,
-            website: None,
-            description: None,
-            original_name: None,
-            english_name: None,
-        },
-    };
-    let entry = root.iter().find_map(|elem| {
-        let arr = elem.as_array()?;
-        find_place_entry_in_array(arr, place_id)
-    });
-    match entry {
-        Some(entry_arr) => {
-            let place_info = entry_arr.get(1).and_then(|v| v.as_array());
-            let coords = place_info
-                .and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
-            let latitude = coords.and_then(|c| c.get(2).and_then(|v| v.as_f64()));
-            let longitude = coords.and_then(|c| c.get(3).and_then(|v| v.as_f64()));
-            let pid = place_info
-                .and_then(|pi| pi.get(7).and_then(|v| v.as_str()));
-            let url = pid.map(|id| format!("https://www.google.com/maps/place/?q=place_id:{}", id));
-            let place_name = entry_arr.get(2).and_then(|v| v.as_str()).map(|s| s.to_string());
-
-            GooglePlaceDetails {
-                latitude,
-                longitude,
-                url,
-                place_name,
-                rating: None,
-                website: None,
-                description: None,
-                original_name: None,
-                english_name: None,
-            }
-        }
-        None => GooglePlaceDetails {
-            latitude: None,
-            longitude: None,
-            url: None,
-            place_name: None,
-            rating: None,
-            website: None,
-            description: None,
-            original_name: None,
-            english_name: None,
-        },
-    }
-}
-
-fn find_place_entry_debug(
-    value: &serde_json::Value,
-    place_id: &str,
-) -> Option<serde_json::Value> {
-    let root = value.as_array()?;
-    root.iter().find_map(|elem| {
-        let arr = elem.as_array()?;
-        let _ = find_place_entry_in_array(arr, place_id)?;
-        Some(elem.clone())
-    })
-}
-
 

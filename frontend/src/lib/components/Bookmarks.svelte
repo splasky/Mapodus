@@ -85,6 +85,23 @@
           {:else}
             <span class="bk-no-coords" title="Missing coordinates">⚠️</span>
           {/if}
+        </div>
+      {/each}
+    </div>
+
+    <button class="primary" onclick={proceed} disabled={selected.size === 0 || transferring}>
+      {#if transferring}
+        <span class="spinner"></span> Enriching & transferring...
+      {:else}
+        Transfer {selected.size} bookmarks to uMap
+      {/if}
+    </button>
+  {/if}
+
+  <div class="nav-row">
+    <button class="nav-prev" onclick={onPrev}>Previous</button>
+    <button class="nav-next" onclick={onNext}>Next</button>
+  </div>
 </div>
 
 <style>
@@ -131,20 +148,3 @@
     font-size: 0.85rem;
   }
 </style>
-      {/each}
-    </div>
-
-    <button class="primary" onclick={proceed} disabled={selected.size === 0 || transferring}>
-      {#if transferring}
-        <span class="spinner"></span> Enriching & transferring...
-      {:else}
-        Transfer {selected.size} bookmarks to uMap
-      {/if}
-    </button>
-  {/if}
-
-  <div class="nav-row">
-    <button class="nav-prev" onclick={onPrev}>Previous</button>
-    <button class="nav-next" onclick={onNext}>Next</button>
-  </div>
-</div>
