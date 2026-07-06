@@ -12,6 +12,7 @@ Import your Google Maps saved places into [uMap](https://umap.openstreetmap.fr/)
 - **Cookie-based enrichment** — optionally paste Google cookies to fill in addresses and missing data
 - **uMap upload** — creates a new map (or one map per list) with bilingual properties (Chinese + English)
 - **CLI mode** — headless conversion from CSV or GeoJSON to uMap
+- **Desktop mode** — Tauri desktop app for macOS, Windows, and Linux
 
 ## Web UI
 
@@ -98,6 +99,45 @@ cd frontend && npm run dev
 
 The frontend dev server runs on port 5173 with API proxied to `localhost:8900`.
 
+## Desktop
+
+The desktop app uses Tauri 2 and embeds the existing Axum backend inside the
+same app process. It does not spawn a separate backend executable.
+
+```bash
+cargo install tauri-cli --version "^2" --locked
+cd frontend && npm install && cd ..
+cd desktop/src-tauri
+cargo tauri dev
+```
+
+Desktop non-sensitive settings are stored in the OS app config directory:
+
+- Linux: `~/.config/gmap-to-umap/config.toml`
+- macOS: `~/Library/Application Support/gmap-to-umap/config.toml`
+- Windows: `%APPDATA%\gmap-to-umap\config.toml`
+
+Secrets such as Google cookies, uMap passwords, OAuth tokens, and session
+cookies must not be stored in this config file.
+
+### Desktop Releases
+
+Pushing a version tag creates a GitHub Release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow builds and uploads:
+
+- macOS `.dmg`
+- Windows `.msi`
+- Linux `.AppImage`
+- Linux binary archive `.tar.gz`
+- GitHub source code `.zip`
+- GitHub source code `.tar.gz`
+
 ### Project structure
 
 ```
@@ -105,6 +145,7 @@ The frontend dev server runs on port 5173 with API proxied to `localhost:8900`.
 ├── cli/            # CLI binary
 ├── web/            # Web server (Axum)
 ├── frontend/       # Svelte SPA
+├── desktop/        # Tauri desktop app
 └── umap/           # uMap submodule (for local testing)
 ```
 

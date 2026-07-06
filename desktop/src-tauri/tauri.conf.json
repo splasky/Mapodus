@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Gmap to uMap",
+  "version": "0.1.0",
+  "identifier": "com.splasky.gmap-to-umap",
+  "build": {
+    "beforeDevCommand": "cd ../frontend && npm install && npm run build",
+    "beforeBuildCommand": "cd ../frontend && npm ci && npm run build",
+    "frontendDist": "../../web/static"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "msi", "appimage"],
+    "icon": ["icons/icon.png"]
+  }
+}
