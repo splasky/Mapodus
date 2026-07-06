@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use umap_core::convert::Converter;
 use umap_core::google::GooglePlace;
+use umap_core::places_api::{PlacesApiClient, PlacesApiEnrichmentStats};
 use umap_core::umap::UmapClient;
 
 use crate::api::errors::ApiError;
@@ -87,8 +88,10 @@ async fn create_and_upload_map(
     layer_name: &str,
     auth: &umap_core::umap::CookieAuth,
     umap_url: &str,
+    places_api_stats: &Option<PlacesApiEnrichmentStats>,
 ) -> Result<MapResult, ApiError> {
     let fc = Converter::to_umap_geojson(places);
+    ensure_has_features(fc.features.len(), map_name, places_api_stats)?;
     let client = UmapClient::new(umap_url);
 
     let result = client
@@ -134,7 +137,7 @@ pub async fn transfer(
         .as_ref()
         .ok_or_else(|| ApiError::BadRequest("No bookmarks uploaded".into()))?;
 
-    let selected: Vec<_> = req
+    let mut selected: Vec<_> = req
         .selected_ids
         .iter()
         .filter_map(|&i| places.get(i))
@@ -145,6 +148,7 @@ pub async fn transfer(
         return Err(ApiError::BadRequest("No bookmarks selected".into()));
     }
 
+    let places_api_stats = enrich_with_places_api_if_configured(&mut selected).await?;
     let mode = app.transfer_mode.as_deref().unwrap_or("single");
 
     if mode == "per_list" {
@@ -177,6 +181,7 @@ pub async fn transfer(
                 name,
                 &auth,
                 &umap_url,
+                &places_api_stats,
             )
             .await?;
             maps.push(mr);
@@ -191,6 +196,7 @@ pub async fn transfer(
         }))
     } else {
         let fc = Converter::to_umap_geojson(&selected);
+        ensure_has_features(fc.features.len(), "Google Maps Saved", &places_api_stats)?;
         let client = UmapClient::new(&umap_url);
 
         let result = client
@@ -226,4 +232,42 @@ pub async fn transfer(
             message: "Map created and bookmarks uploaded".into(),
         }))
     }
+}
+
+async fn enrich_with_places_api_if_configured(
+    places: &mut [GooglePlace],
+) -> Result<Option<PlacesApiEnrichmentStats>, ApiError> {
+    let client = PlacesApiClient::with_optional_api_key(places_api_key());
+    client
+        .enrich_places(places)
+        .await
+        .map(Some)
+        .map_err(|e| ApiError::Internal(format!("Google Maps URI enrichment failed: {}", e)))
+}
+
+fn places_api_key() -> Option<String> {
+    std::env::var("GOOGLE_MAPS_API_KEY")
+        .ok()
+        .filter(|key| !key.trim().is_empty())
+}
+
+fn ensure_has_features(
+    feature_count: usize,
+    map_name: &str,
+    places_api_stats: &Option<PlacesApiEnrichmentStats>,
+) -> Result<(), ApiError> {
+    if feature_count == 0 {
+        let places_api_hint = match places_api_stats {
+            Some(stats) => format!(
+                " Google Maps URI enrichment ran but did not resolve usable coordinates (enriched: {}, skipped: {}, failed: {}).",
+                stats.enriched, stats.skipped, stats.failed
+            ),
+            None => " Google Maps URI enrichment did not run.".to_string(),
+        };
+        return Err(ApiError::BadRequest(format!(
+            "No data points were generated for '{}'. The selected POIs do not have usable coordinates.{}",
+            map_name, places_api_hint
+        )));
+    }
+    Ok(())
 }

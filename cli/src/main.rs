@@ -136,8 +136,22 @@ mod tests {
 
         assert_eq!(
             props.get("name").and_then(|v| v.as_str()),
+            Some("六扇門時尚湯鍋 新竹東南店")
+        );
+        assert_eq!(
+            props.get("title").and_then(|v| v.as_str()),
             Some("6owl door Hsinchu Dongnan Branch")
         );
+        assert_eq!(
+            props.get("place_name").and_then(|v| v.as_str()),
+            Some("六扇門時尚湯鍋 新竹東南店")
+        );
+        assert_eq!(props.get("rating").and_then(|v| v.as_str()), Some("4"));
+        assert_eq!(
+            props.get("english_name").and_then(|v| v.as_str()),
+            Some("6owl door Hsinchu Dongnan Branch")
+        );
+        assert!(props.get("website").and_then(|v| v.as_str()).is_some());
 
         let desc = props
             .get("description")
