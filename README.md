@@ -31,6 +31,7 @@ cd frontend && npm install && npm run build && cd ..
 
 # Copy .env.example to .env and edit with your settings
 # Required: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (for OAuth login)
+# Optional: GOOGLE_MAPS_API_KEY (resolve missing POI coordinates)
 # Optional: REDIRECT_URL, DEV_MODE, DATABASE_URL
 
 # Start the server

@@ -10,6 +10,11 @@ pub struct GoogleSavedPlace {
     pub longitude: Option<f64>,
     pub url: Option<String>,
     pub notes: Option<String>,
+    pub place_name: Option<String>,
+    pub rating: Option<String>,
+    pub website: Option<String>,
+    pub description: Option<String>,
+    pub english_name: Option<String>,
     pub place_id: Option<String>,
     pub list: String,
 }
@@ -27,6 +32,11 @@ pub struct GooglePlaceDetails {
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
     pub url: Option<String>,
+    pub place_name: Option<String>,
+    pub rating: Option<String>,
+    pub website: Option<String>,
+    pub description: Option<String>,
+    pub english_name: Option<String>,
 }
 
 pub struct GoogleMapsClient {
@@ -260,7 +270,8 @@ impl GoogleMapsClient {
         for list in &lists {
             eprintln!("  Fetching places for '{}'...", list.name);
             match self.fetch_list_places(&list.id, &list.name).await {
-                Ok(places) => {
+                Ok(mut places) => {
+                    self.enrich_places_with_details(&mut places).await;
                     eprintln!("    Got {} places", places.len());
                     all_places.extend(places);
                 }
@@ -270,6 +281,54 @@ impl GoogleMapsClient {
             }
         }
         Ok(all_places)
+    }
+
+    async fn enrich_places_with_details(&self, places: &mut [GoogleSavedPlace]) {
+        for place in places {
+            let Some(place_id) = place.place_id.clone() else {
+                continue;
+            };
+
+            match self.get_place_details(&place_id).await {
+                Ok(Some(details)) => place.apply_details(details),
+                Ok(None) => {}
+                Err(e) => {
+                    eprintln!(
+                        "[place_details] Failed to enrich place_id={}: {}",
+                        place_id, e
+                    );
+                }
+            }
+        }
+    }
+}
+
+impl GoogleSavedPlace {
+    fn apply_details(&mut self, details: GooglePlaceDetails) {
+        if self.latitude.is_none() {
+            self.latitude = details.latitude;
+        }
+        if self.longitude.is_none() {
+            self.longitude = details.longitude;
+        }
+        if self.url.is_none() {
+            self.url = details.url;
+        }
+        if self.place_name.is_none() {
+            self.place_name = details.place_name;
+        }
+        if self.rating.is_none() {
+            self.rating = details.rating;
+        }
+        if self.website.is_none() {
+            self.website = details.website;
+        }
+        if self.description.is_none() {
+            self.description = details.description;
+        }
+        if self.english_name.is_none() {
+            self.english_name = details.english_name;
+        }
     }
 }
 
@@ -668,6 +727,11 @@ fn parse_getlist_places(
             longitude,
             url,
             notes,
+            place_name: Some(name.to_string()),
+            rating: extract_entry_rating(arr),
+            website: extract_entry_website(arr),
+            description: extract_entry_description(arr, name),
+            english_name: extract_entry_english_name(arr, name),
             place_id,
             list: list_name.to_string(),
         });
@@ -684,7 +748,10 @@ fn parse_place_details(
     let root = match value.as_array() {
         Some(a) => a,
         None => {
-            eprintln!("[place_details] Root is not an array for place_id '{}'", place_id);
+            eprintln!(
+                "[place_details] Root is not an array for place_id '{}'",
+                place_id
+            );
             return Ok(None);
         }
     };
@@ -702,23 +769,43 @@ fn parse_place_details(
     match entry {
         Some(entry_arr) => {
             let place_info = entry_arr.get(1).and_then(|v| v.as_array());
-            let coords = place_info
-                .and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
+            let coords = place_info.and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
             let latitude = coords.and_then(|c| c.get(2).and_then(|v| v.as_f64()));
             let longitude = coords.and_then(|c| c.get(3).and_then(|v| v.as_f64()));
-            let pid = place_info
-                .and_then(|pi| pi.get(7).and_then(|v| v.as_str()));
+            let pid = place_info.and_then(|pi| pi.get(7).and_then(|v| v.as_str()));
             let url = pid.map(|id| format!("https://www.google.com/maps/place/?q=place_id:{}", id));
+            let place_name = entry_arr
+                .get(2)
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string());
+            let name_for_filter = place_name.as_deref().unwrap_or("");
+            let rating = extract_entry_rating(entry_arr);
+            let website = extract_entry_website(entry_arr);
+            let description = extract_entry_description(entry_arr, name_for_filter);
+            let english_name = extract_entry_english_name(entry_arr, name_for_filter);
 
-            if latitude.is_some() || longitude.is_some() {
+            if latitude.is_some()
+                || longitude.is_some()
+                || place_name.is_some()
+                || rating.is_some()
+                || website.is_some()
+                || description.is_some()
+                || english_name.is_some()
+            {
                 eprintln!(
-                    "[place_details] Found coords for place_id '{}': {:?}, {:?}",
+                    "[place_details] Found details for place_id '{}': coords={:?},{:?}",
                     place_id, latitude, longitude
                 );
                 Ok(Some(GooglePlaceDetails {
                     latitude,
                     longitude,
                     url,
+                    place_name,
+                    rating,
+                    website,
+                    description,
+                    english_name,
                 }))
             } else {
                 eprintln!(
@@ -729,10 +816,7 @@ fn parse_place_details(
             }
         }
         None => {
-            eprintln!(
-                "[place_details] No entry found for place_id '{}'",
-                place_id
-            );
+            eprintln!("[place_details] No entry found for place_id '{}'", place_id);
             Ok(None)
         }
     }
@@ -758,6 +842,126 @@ fn find_place_entry_in_array<'a>(
         }
     }
     None
+}
+
+fn extract_rating(value: &serde_json::Value) -> Option<String> {
+    find_number(value, &|n| (0.0..=5.0).contains(&n) && n.fract() != 0.0)
+        .or_else(|| find_number(value, &|n| (1.0..=5.0).contains(&n)))
+        .map(format_rating)
+}
+
+fn extract_entry_rating(entry: &[serde_json::Value]) -> Option<String> {
+    entry
+        .get(5)
+        .and_then(|v| v.as_f64())
+        .filter(|n| (1.0..=5.0).contains(n))
+        .map(format_rating)
+        .or_else(|| extract_rating(&serde_json::Value::Array(entry.to_vec())))
+}
+
+fn format_rating(n: f64) -> String {
+    let rounded = (n * 10.0).round() / 10.0;
+    if rounded.fract() == 0.0 {
+        format!("{:.0}", rounded)
+    } else {
+        format!("{:.1}", rounded)
+    }
+}
+
+fn extract_website(value: &serde_json::Value) -> Option<String> {
+    find_string(value, &is_website)
+}
+
+fn extract_entry_website(entry: &[serde_json::Value]) -> Option<String> {
+    entry
+        .get(6)
+        .and_then(|v| v.as_str())
+        .filter(|s| is_website(s))
+        .map(|s| s.to_string())
+        .or_else(|| extract_website(&serde_json::Value::Array(entry.to_vec())))
+}
+
+fn is_website(s: &str) -> bool {
+    let lower = s.to_ascii_lowercase();
+    (lower.starts_with("http://") || lower.starts_with("https://"))
+        && !lower.contains("google.com/maps")
+        && !lower.contains("maps.google.")
+        && !lower.contains("gstatic.com")
+        && !lower.contains("googleusercontent.com")
+}
+
+fn extract_description(value: &serde_json::Value, name: &str) -> Option<String> {
+    find_string(value, &|s| is_description(s, name))
+}
+
+fn extract_entry_description(entry: &[serde_json::Value], name: &str) -> Option<String> {
+    entry
+        .get(7)
+        .and_then(|v| v.as_str())
+        .filter(|s| is_description(s, name))
+        .map(|s| s.to_string())
+        .or_else(|| extract_description(&serde_json::Value::Array(entry.to_vec()), name))
+}
+
+fn is_description(s: &str, name: &str) -> bool {
+    let trimmed = s.trim();
+    trimmed.chars().count() >= 12
+        && trimmed != name
+        && !trimmed.is_ascii()
+        && !trimmed.starts_with("http://")
+        && !trimmed.starts_with("https://")
+        && !trimmed.starts_with("ChIJ")
+        && !trimmed.contains("google.com/maps")
+}
+
+fn extract_english_name(value: &serde_json::Value, name: &str) -> Option<String> {
+    find_string(value, &|s| is_english_name(s, name))
+}
+
+fn extract_entry_english_name(entry: &[serde_json::Value], name: &str) -> Option<String> {
+    entry
+        .get(4)
+        .and_then(|v| v.as_str())
+        .filter(|s| is_english_name(s, name))
+        .map(|s| s.to_string())
+        .or_else(|| extract_english_name(&serde_json::Value::Array(entry.to_vec()), name))
+}
+
+fn is_english_name(s: &str, name: &str) -> bool {
+    let trimmed = s.trim();
+    !trimmed.is_empty()
+        && trimmed != name
+        && trimmed.is_ascii()
+        && trimmed.chars().any(|c| c.is_ascii_alphabetic())
+        && !trimmed.starts_with("http://")
+        && !trimmed.starts_with("https://")
+        && !trimmed.starts_with("ChIJ")
+}
+
+fn find_string(value: &serde_json::Value, predicate: &impl Fn(&str) -> bool) -> Option<String> {
+    match value {
+        serde_json::Value::String(s) if predicate(s) => Some(s.to_string()),
+        serde_json::Value::Array(items) => {
+            items.iter().find_map(|item| find_string(item, predicate))
+        }
+        serde_json::Value::Object(map) => {
+            map.values().find_map(|item| find_string(item, predicate))
+        }
+        _ => None,
+    }
+}
+
+fn find_number(value: &serde_json::Value, predicate: &impl Fn(f64) -> bool) -> Option<f64> {
+    match value {
+        serde_json::Value::Number(n) => n.as_f64().filter(|v| predicate(*v)),
+        serde_json::Value::Array(items) => {
+            items.iter().find_map(|item| find_number(item, predicate))
+        }
+        serde_json::Value::Object(map) => {
+            map.values().find_map(|item| find_number(item, predicate))
+        }
+        _ => None,
+    }
 }
 
 // ── MD5 (no external dependency) ──
@@ -885,5 +1089,102 @@ impl Md5State {
         state[1] = state[1].wrapping_add(b);
         state[2] = state[2].wrapping_add(c);
         state[3] = state[3].wrapping_add(d);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_getlist_places_extracts_available_details() {
+        let response = serde_json::json!([[
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            [[
+                null,
+                [
+                    null,
+                    null,
+                    "Sanitized address",
+                    null,
+                    null,
+                    [null, null, 24.1477358, 120.6736482],
+                    null,
+                    "ChIJSANITIZED"
+                ],
+                "SEE TEA戲茶",
+                "user note",
+                "See Tea",
+                4.7,
+                "https://example.com/see-tea",
+                "提供茶飲與甜點的測試簡介。"
+            ]]
+        ]]);
+
+        let places = parse_getlist_places(&response, "Favorites").unwrap();
+
+        assert_eq!(places.len(), 1);
+        let place = &places[0];
+        assert_eq!(place.title.as_deref(), Some("SEE TEA戲茶"));
+        assert_eq!(place.notes.as_deref(), Some("user note"));
+        assert_eq!(place.place_name.as_deref(), Some("SEE TEA戲茶"));
+        assert_eq!(place.place_id.as_deref(), Some("ChIJSANITIZED"));
+        assert_eq!(place.rating.as_deref(), Some("4.7"));
+        assert_eq!(
+            place.website.as_deref(),
+            Some("https://example.com/see-tea")
+        );
+        assert_eq!(place.english_name.as_deref(), Some("See Tea"));
+        assert_eq!(
+            place.description.as_deref(),
+            Some("提供茶飲與甜點的測試簡介。")
+        );
+        assert_eq!(place.latitude, Some(24.1477358));
+        assert_eq!(place.longitude, Some(120.6736482));
+    }
+
+    #[test]
+    fn apply_details_preserves_existing_saved_place_fields() {
+        let mut place = GoogleSavedPlace {
+            title: Some("Saved title".to_string()),
+            address: None,
+            latitude: Some(1.0),
+            longitude: None,
+            url: None,
+            notes: None,
+            place_name: None,
+            rating: None,
+            website: None,
+            description: None,
+            english_name: None,
+            place_id: Some("ChIJSANITIZED".to_string()),
+            list: "Favorites".to_string(),
+        };
+
+        place.apply_details(GooglePlaceDetails {
+            latitude: Some(2.0),
+            longitude: Some(3.0),
+            url: Some("https://www.google.com/maps/place/?q=place_id:ChIJSANITIZED".to_string()),
+            place_name: Some("Detail name".to_string()),
+            rating: Some("4.5".to_string()),
+            website: Some("https://example.com".to_string()),
+            description: Some("測試簡介內容。".to_string()),
+            english_name: Some("Detail English".to_string()),
+        });
+
+        assert_eq!(place.latitude, Some(1.0));
+        assert_eq!(place.longitude, Some(3.0));
+        assert_eq!(place.place_name.as_deref(), Some("Detail name"));
+        assert_eq!(place.rating.as_deref(), Some("4.5"));
+        assert_eq!(place.website.as_deref(), Some("https://example.com"));
+        assert_eq!(place.description.as_deref(), Some("測試簡介內容。"));
+        assert_eq!(place.english_name.as_deref(), Some("Detail English"));
     }
 }

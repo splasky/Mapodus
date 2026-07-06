@@ -10,6 +10,7 @@
   let loggedIn = $state(false);
   let umapConnected = $state(false);
   let bookmarksUploaded = $state(false);
+  let selectedIds = $state<number[]>([]);
 
   function onLogin() {
     loggedIn = true;
@@ -26,7 +27,8 @@
     bookmarksUploaded = true;
     step = 'bookmarks';
   }
-  function onSelect() {
+  function onSelect(ids: number[]) {
+    selectedIds = ids;
     step = 'connect';
   }
   function onConnect() {
@@ -38,6 +40,7 @@
     loggedIn = false;
     umapConnected = false;
     bookmarksUploaded = false;
+    selectedIds = [];
   }
 
   function goPrev() {
@@ -94,7 +97,7 @@
   {:else if step === 'connect'}
     <ConnectUmap onConnect={onConnect} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'transfer'}
-    <Transfer onDone={onDone} onPrev={goPrev} />
+    <Transfer {selectedIds} onDone={onDone} onPrev={goPrev} />
   {/if}
 </div>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { apiGet } from '../api';
 
-  let { onSelect, onPrev, onNext }: { onSelect: () => void; onPrev?: () => void; onNext?: () => void } = $props();
+  let { onSelect, onPrev, onNext }: { onSelect: (selectedIds: number[]) => void; onPrev?: () => void; onNext?: () => void } = $props();
   let bookmarks = $state<any[]>([]);
   let selected = $state<Set<number>>(new Set());
   let loading = $state(true);
@@ -38,14 +38,8 @@
     selected = new Set();
   }
 
-  async function proceed() {
-    // Store selection in session
-    await fetch('/api/transfer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ selected_ids: [...selected] }),
-    }).catch(() => {});
-    onSelect();
+  function proceed() {
+    onSelect([...selected]);
   }
 
   $effect(() => { load(); });

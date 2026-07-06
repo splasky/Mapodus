@@ -1,7 +1,7 @@
 <script lang="ts">
   import { apiPost } from '../api';
 
-  let { onDone, onPrev }: { onDone: () => void; onPrev?: () => void } = $props();
+  let { selectedIds, onDone, onPrev }: { selectedIds: number[]; onDone: () => void; onPrev?: () => void } = $props();
   let transferring = $state(false);
   let error = $state('');
   let result = $state<{
@@ -14,13 +14,9 @@
     transferring = true;
     error = '';
     try {
-      // Fetch selected IDs from the bookmark list
-      const bookmarks = await (await fetch('/api/bookmarks')).json();
-      const selectedIds = Array.from(
-        { length: bookmarks.bookmarks.length },
-        (_, i) => i
-      );
-
+      if (!selectedIds.length) {
+        throw new Error('No bookmarks selected for transfer');
+      }
       const res = await apiPost<any>('/transfer', { selected_ids: selectedIds });
       result = res;
     } catch (e) {
