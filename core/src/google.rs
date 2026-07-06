@@ -46,6 +46,23 @@ pub fn extract_coords_from_url(url: &str) -> Option<(f64, f64)> {
         }
     }
 
+    // Pattern: /maps/search/lat,lng in the path
+    if let Some(search_pos) = url.find("/maps/search/") {
+        let after_search = &url[search_pos + "/maps/search/".len()..];
+        let end = after_search
+            .find(|c: char| ['?', '&', '#', '/'].contains(&c))
+            .unwrap_or(after_search.len());
+        let value = &after_search[..end];
+        let parts: Vec<&str> = value.split(',').collect();
+        if parts.len() >= 2 {
+            let lat = parts[0].parse::<f64>().ok()?;
+            let lng = parts[1].parse::<f64>().ok()?;
+            if lat.is_finite() && lng.is_finite() {
+                return Some((lat, lng));
+            }
+        }
+    }
+
     None
 }
 
@@ -87,43 +104,23 @@ pub struct GooglePlace {
 impl GooglePlace {
     fn find_header_index(
         header_map: &std::collections::HashMap<String, usize>,
-        english_name: &str,
+        field_name: &str,
     ) -> Option<usize> {
-        let lower = english_name.to_lowercase();
+        let aliases = header_aliases(field_name);
 
-        if let Some(&idx) = header_map.get(&lower) {
-            return Some(idx);
-        }
-
-        if let Some((_, &idx)) = header_map.iter().find(|(key, _)| key.contains(&lower)) {
-            return Some(idx);
-        }
-
-        let chinese_map: &[(&str, &str)] = &[
-            ("標題", "title"),
-            ("筆記", "notes"),
-            ("網址", "url"),
-            ("標籤", "tags"),
-            ("留言", "comments"),
-            ("緯度", "latitude"),
-            ("經度", "longitude"),
-            ("地點名稱", "place name"),
-            ("星級評分", "rating"),
-            ("網站", "website"),
-            ("簡介", "description"),
-            ("原文名稱", "original name"),
-            ("英文名稱", "english name"),
-        ];
-
-        for (cn, en) in chinese_map {
-            if (*en == lower || *en == english_name.to_lowercase())
-                && let Some(&idx) = header_map.get(&cn.to_string())
-            {
-                return Some(idx);
-            }
-        }
-
-        None
+        aliases
+            .iter()
+            .find_map(|alias| header_map.get(&normalize_header(alias)).copied())
+            .or_else(|| {
+                header_map
+                    .iter()
+                    .find(|(header, _)| {
+                        aliases
+                            .iter()
+                            .any(|alias| header.contains(&normalize_header(alias)))
+                    })
+                    .map(|(_, &idx)| idx)
+            })
     }
 
     pub fn from_csv_record(record: &csv::StringRecord, headers: &csv::StringRecord) -> Self {
@@ -147,7 +144,7 @@ impl GooglePlace {
         let header_map = headers
             .iter()
             .enumerate()
-            .map(|(i, header)| (header.to_lowercase(), i))
+            .map(|(i, header)| (normalize_header(header), i))
             .collect::<std::collections::HashMap<String, usize>>();
 
         macro_rules! set_field {
@@ -256,6 +253,82 @@ impl GooglePlace {
     }
 }
 
+fn normalize_header(header: &str) -> String {
+    header
+        .trim()
+        .to_lowercase()
+        .chars()
+        .filter(|ch| {
+            !ch.is_whitespace()
+                && !matches!(
+                    ch,
+                    '(' | ')' | '（' | '）' | '[' | ']' | '【' | '】' | '-' | '_' | '/'
+                )
+        })
+        .collect()
+}
+
+fn header_aliases(field_name: &str) -> &'static [&'static str] {
+    match field_name {
+        "Title" => &["title", "標題", "标题", "タイトル", "題名", "제목"],
+        "Notes" => &["notes", "note", "筆記", "笔记", "メモ", "ノート", "메모"],
+        "URL" => &["url", "網址", "网址", "リンク", "link"],
+        "Tags" => &["tags", "tag", "標籤", "标签", "タグ", "ラベル", "태그"],
+        "Comments" => &[
+            "comments",
+            "comment",
+            "留言",
+            "コメント",
+            "コメント欄",
+            "댓글",
+        ],
+        "Latitude" => &["latitude", "lat", "緯度", "纬度", "緯度latitude", "위도"],
+        "Longitude" => &["longitude", "lng", "lon", "經度", "经度", "経度", "경도"],
+        "Place Name" => &[
+            "place name",
+            "place",
+            "地點名稱",
+            "地点名称",
+            "場所名",
+            "場所の名前",
+            "장소 이름",
+        ],
+        "Rating" => &[
+            "rating",
+            "星級評分",
+            "评分",
+            "評分",
+            "評価",
+            "レーティング",
+            "평점",
+        ],
+        "Website" => &[
+            "website",
+            "web site",
+            "網站",
+            "网站",
+            "ウェブサイト",
+            "サイト",
+        ],
+        "Description" => &["description", "簡介", "简介", "説明", "설명"],
+        "Original Name" => &[
+            "original name",
+            "原文名稱",
+            "原文名称",
+            "元の名前",
+            "원래 이름",
+        ],
+        "English Name" => &[
+            "english name",
+            "英文名稱",
+            "英文名称",
+            "英語名",
+            "영어 이름",
+        ],
+        _ => &[],
+    }
+}
+
 pub fn parse_takeout(path: &str) -> Result<Vec<GooglePlace>> {
     let file = std::fs::File::open(path)?;
     let extension = std::path::Path::new(path)
@@ -297,5 +370,80 @@ pub fn parse_takeout(path: &str) -> Result<Vec<GooglePlace>> {
         _ => Err(anyhow!(
             "Unsupported file format. Expected .csv, .json, or .geojson"
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_japanese_takeout_headers() {
+        let headers =
+            csv::StringRecord::from(vec!["タイトル", "メモ", "リンク", "タグ", "コメント"]);
+        let record = csv::StringRecord::from(vec![
+            "東京タワー",
+            "夜景",
+            "https://www.google.com/maps/search/35.6586,139.7454",
+            "旅行",
+            "再訪",
+        ]);
+
+        let place = GooglePlace::from_csv_record(&record, &headers);
+
+        assert_eq!(place.title.as_deref(), Some("東京タワー"));
+        assert_eq!(place.notes.as_deref(), Some("夜景"));
+        assert_eq!(
+            place.url.as_deref(),
+            Some("https://www.google.com/maps/search/35.6586,139.7454")
+        );
+        assert_eq!(place.tags.as_deref(), Some("旅行"));
+        assert_eq!(place.comments.as_deref(), Some("再訪"));
+        assert_eq!(place.latitude.as_deref(), Some("35.6586"));
+        assert_eq!(place.longitude.as_deref(), Some("139.7454"));
+    }
+
+    #[test]
+    fn parses_localized_detail_headers_with_english_hints() {
+        let headers = csv::StringRecord::from(vec![
+            "標題",
+            "網址",
+            "緯度(Latitude)",
+            "經度(Longitude)",
+            "場所名",
+            "評価",
+            "ウェブサイト",
+            "説明",
+            "元の名前",
+            "英語名",
+        ]);
+        let record = csv::StringRecord::from(vec![
+            "スカイツリー",
+            "https://www.google.com/maps/place/?q=place_id:abc123",
+            "35.7100",
+            "139.8107",
+            "東京スカイツリー",
+            "4.5",
+            "https://www.tokyo-skytree.jp/",
+            "展望台",
+            "東京スカイツリー",
+            "Tokyo Skytree",
+        ]);
+
+        let place = GooglePlace::from_csv_record(&record, &headers);
+
+        assert_eq!(place.title.as_deref(), Some("スカイツリー"));
+        assert_eq!(place.latitude.as_deref(), Some("35.7100"));
+        assert_eq!(place.longitude.as_deref(), Some("139.8107"));
+        assert_eq!(place.place_name.as_deref(), Some("東京スカイツリー"));
+        assert_eq!(place.rating.as_deref(), Some("4.5"));
+        assert_eq!(
+            place.website.as_deref(),
+            Some("https://www.tokyo-skytree.jp/")
+        );
+        assert_eq!(place.description.as_deref(), Some("展望台"));
+        assert_eq!(place.original_name.as_deref(), Some("東京スカイツリー"));
+        assert_eq!(place.english_name.as_deref(), Some("Tokyo Skytree"));
+        assert_eq!(place.place_id.as_deref(), Some("abc123"));
     }
 }
