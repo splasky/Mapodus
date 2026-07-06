@@ -1,0 +1,100 @@
+name: Desktop Release
+
+on:
+    push:
+        tags:
+            - "v*"
+
+permissions:
+    contents: write
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    publish-desktop:
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: macos-latest
+                      args: --bundles dmg
+                    - platform: windows-latest
+                      args: --bundles msi
+                    - platform: ubuntu-latest
+                      args: --bundles appimage
+        runs-on: ${{ matrix.platform }}
+
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Install Tauri Linux dependencies
+              if: matrix.platform == 'ubuntu-latest'
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y \
+                      libwebkit2gtk-4.1-dev \
+                      libappindicator3-dev \
+                      libfuse2 \
+                      librsvg2-dev \
+                      patchelf \
+                      xdg-utils
+
+            - name: Install nightly toolchain
+              run: rustup toolchain install nightly
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 26
+                  cache: npm
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Install frontend dependencies
+              working-directory: frontend
+              run: npm ci
+
+            - name: Cache cargo
+              uses: actions/cache@v6
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-desktop-release-cargo-${{ hashFiles('Cargo.lock') }}
+
+            - name: Build and upload Tauri bundles
+              uses: tauri-apps/tauri-action@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  projectPath: desktop/src-tauri
+                  tagName: ${{ github.ref_name }}
+                  releaseName: Gmap to uMap ${{ github.ref_name }}
+                  releaseBody: |
+                      Desktop release for Gmap to uMap.
+
+                      Artifacts:
+                      - macOS: dmg
+                      - Windows: msi
+                      - Linux: AppImage and binary tar.gz
+                      - Source code archives are provided by GitHub.
+                  releaseDraft: false
+                  prerelease: false
+                  args: ${{ matrix.args }}
+
+            - name: Package Linux binary archive
+              if: matrix.platform == 'ubuntu-latest'
+              run: |
+                  mkdir -p dist/gmap-to-umap-linux-x86_64
+                  cp target/release/gmap-to-umap-desktop dist/gmap-to-umap-linux-x86_64/
+                  cp README.md dist/gmap-to-umap-linux-x86_64/
+                  cp desktop/README.md dist/gmap-to-umap-linux-x86_64/DESKTOP.md
+                  tar -C dist -czf gmap-to-umap-linux-x86_64.tar.gz gmap-to-umap-linux-x86_64
+
+            - name: Upload Linux binary archive
+              if: matrix.platform == 'ubuntu-latest'
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  files: gmap-to-umap-linux-x86_64.tar.gz
