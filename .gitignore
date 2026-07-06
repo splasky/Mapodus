@@ -39,6 +39,8 @@ frontend/node_modules/
 # Agent session files
 session-ses_*.md
 google-*
+agent-*
+issue*
 
 # Task notes / docs
 project.md
