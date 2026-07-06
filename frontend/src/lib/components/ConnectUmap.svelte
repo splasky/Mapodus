@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { apiPost } from '../api';
+  import { apiGet, apiPost } from '../api';
 
   let { onConnect, onPrev, onNext }: { onConnect: () => void; onPrev?: () => void; onNext?: () => void } = $props();
   let umapUrl = $state('https://umap.openstreetmap.fr/en/');
@@ -7,6 +7,18 @@
   let password = $state('');
   let connecting = $state(false);
   let error = $state('');
+
+  $effect(() => {
+    apiGet<{ umap_url?: string }>('/umap/status')
+      .then(status => {
+        if (status.umap_url) {
+          umapUrl = status.umap_url;
+        }
+      })
+      .catch(() => {
+        // Keep the built-in default if the status request fails.
+      });
+  });
 
   async function connect() {
     if (!umapUrl || !username || !password) {
@@ -36,7 +48,7 @@
 
   <label>
     uMap URL
-    <input bind:value={umapUrl} placeholder="http://localhost:8000/en/" />
+    <input bind:value={umapUrl} placeholder="https://umap.openstreetmap.fr/en/" />
   </label>
   <label>
     Username

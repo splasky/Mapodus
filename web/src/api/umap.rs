@@ -78,8 +78,17 @@ pub async fn status(session: Session) -> Result<impl IntoResponse, ApiError> {
     let app = AppSession::from_session(&session).await;
     Ok(Json(UmapStatus {
         connected: app.umap_auth.is_some(),
-        umap_url: app.umap_url.clone(),
+        umap_url: app.umap_url.clone().or_else(|| Some(default_umap_url())),
     }))
+}
+
+fn default_umap_url() -> String {
+    std::env::var("UMAP_DEFAULT_URL")
+        .or_else(|_| std::env::var("UMAP_URL"))
+        .ok()
+        .map(|url| url.trim().to_string())
+        .filter(|url| !url.is_empty())
+        .unwrap_or_else(|| "https://umap.openstreetmap.fr/en/".to_string())
 }
 
 async fn create_and_upload_map(
