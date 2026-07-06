@@ -30,9 +30,8 @@ cargo build --workspace
 cd frontend && npm install && npm run build && cd ..
 
 # Copy .env.example to .env and edit with your settings
-# Required: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (for OAuth login)
 # Optional: GOOGLE_MAPS_API_KEY (resolve missing POI coordinates)
-# Optional: REDIRECT_URL, DEV_MODE, DATABASE_URL
+# Optional: DEV_MODE, DATABASE_URL
 
 # Start the server
 cargo run --bin web
@@ -42,11 +41,10 @@ Open **http://localhost:8900** in your browser.
 
 ### Usage flow
 
-1. **Sign in** with Google (OAuth) — used only for session identity
-2. **Import** — choose **Google Takeout CSV** or **Live Google Maps import (cookies)**
-3. **Select bookmarks** — pick which places to transfer
-4. **Connect uMap** — enter your uMap instance URL and session cookies
-5. **Transfer** — places are uploaded as markers to a new uMap map
+1. **Import** — choose **Google Takeout CSV** or **Live Google Maps import (cookies)**
+2. **Select bookmarks** — pick which places to transfer
+3. **Connect uMap** — enter your uMap instance URL and session cookies
+4. **Transfer** — places are uploaded as markers to a new uMap map
 
 ## CLI
 
@@ -75,9 +73,6 @@ google-maps-to-umap --takeout ./Saved.csv --umap-map-id 123456 --umap-cookie "se
 ```
 
 ## Authentication
-
-### Google OAuth (web UI)
-Sign in with your Google account. The app uses OAuth 2.0 (email + profile scopes only).
 
 ### Google Maps cookies (live import)
 1. Open [google.com/maps](https://www.google.com/maps) in your browser
