@@ -6,15 +6,8 @@ use umap_core::google::GooglePlace;
 use umap_core::google_maps_api::GoogleSavedPlace;
 use umap_core::umap::CookieAuth;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoogleUser {
-    pub name: Option<String>,
-    pub email: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppSession {
-    pub google_user: Option<GoogleUser>,
     pub bookmarks: Option<Vec<GooglePlace>>,
     pub selected_ids: Option<Vec<usize>>,
     pub umap_auth: Option<CookieAuth>,

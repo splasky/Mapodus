@@ -1,4 +1,3 @@
-pub mod auth;
 pub mod bookmarks;
 pub mod errors;
 pub mod google_import;
@@ -8,12 +7,6 @@ use axum::Router;
 
 pub fn routes() -> Router {
     let mut router = Router::new()
-        .route("/api/auth/google", axum::routing::get(auth::google_login))
-        .route(
-            "/api/auth/google/callback",
-            axum::routing::get(auth::google_callback),
-        )
-        .route("/api/auth/status", axum::routing::get(auth::status))
         .route(
             "/api/bookmarks/upload",
             axum::routing::post(bookmarks::upload),

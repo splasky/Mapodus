@@ -1,20 +1,14 @@
 <script lang="ts">
-  import Login from './lib/components/Login.svelte';
   import Upload from './lib/components/Upload.svelte';
   import GoogleImport from './lib/components/GoogleImport.svelte';
   import Bookmarks from './lib/components/Bookmarks.svelte';
   import ConnectUmap from './lib/components/ConnectUmap.svelte';
   import Transfer from './lib/components/Transfer.svelte';
 
-  let step = $state<'login' | 'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer'>('login');
-  let loggedIn = $state(false);
+  let step = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer'>('upload');
   let umapConnected = $state(false);
   let bookmarksUploaded = $state(false);
 
-  function onLogin() {
-    loggedIn = true;
-    step = 'upload';
-  }
   function onUpload() {
     bookmarksUploaded = true;
     step = 'bookmarks';
@@ -34,15 +28,14 @@
     step = 'transfer';
   }
   function onDone() {
-    step = 'login';
-    loggedIn = false;
+    step = 'upload';
     umapConnected = false;
     bookmarksUploaded = false;
   }
 
   function goPrev() {
     switch (step) {
-      case 'upload': case 'google-import': step = 'login'; break;
+      case 'google-import': step = 'upload'; break;
       case 'bookmarks': step = 'upload'; break;
       case 'connect': step = 'bookmarks'; break;
       case 'transfer': step = 'connect'; break;
@@ -50,7 +43,6 @@
   }
   function goNext() {
     switch (step) {
-      case 'login': step = 'upload'; break;
       case 'upload': step = 'bookmarks'; break;
       case 'google-import': step = 'bookmarks'; break;
       case 'bookmarks': step = 'connect'; break;
@@ -66,26 +58,21 @@
   </div>
 
   <div class="steps">
-    <div class="step {step === 'login' ? 'active' : ''} {loggedIn ? 'done' : ''}">
-      <span class="step-num">1</span> Sign In
-    </div>
     <div class="step {step === 'upload' || step === 'google-import' ? 'active' : ''} {bookmarksUploaded ? 'done' : ''}">
-      <span class="step-num">2</span> Import
+      <span class="step-num">1</span> Import
     </div>
     <div class="step {step === 'bookmarks' ? 'active' : ''} {bookmarksUploaded ? 'done' : ''}">
-      <span class="step-num">3</span> Select Bookmarks
+      <span class="step-num">2</span> Select Bookmarks
     </div>
     <div class="step {step === 'connect' ? 'active' : ''} {umapConnected ? 'done' : ''}">
-      <span class="step-num">4</span> Connect uMap
+      <span class="step-num">3</span> Connect uMap
     </div>
     <div class="step {step === 'transfer' ? 'active' : ''}">
-      <span class="step-num">5</span> Transfer
+      <span class="step-num">4</span> Transfer
     </div>
   </div>
 
-  {#if step === 'login'}
-    <Login {onLogin} onNext={goNext} />
-  {:else if step === 'upload'}
+  {#if step === 'upload'}
     <Upload {onUpload} {onGoogleImport} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'google-import'}
     <GoogleImport onImport={onImportDone} onPrev={goPrev} onNext={goNext} />
