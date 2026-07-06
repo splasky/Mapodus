@@ -184,22 +184,27 @@ pub async fn enrich(
 
     let mut updated: Vec<GooglePlace> = Vec::with_capacity(bookmarks.len());
     for mut place in bookmarks {
-        // Try URL-based extraction first (always works, no cookies needed)
+        let mut changed = false;
+
+        // Try URL-based coordinate extraction first; detail enrichment may still add other fields.
         if (place.latitude.is_none() || place.longitude.is_none())
             && let Some(url) = &place.url
             && let Some((lat, lng)) = extract_coords_from_url(url)
         {
             place.latitude = Some(lat.to_string());
             place.longitude = Some(lng.to_string());
-            enriched += 1;
-            updated.push(place);
-            continue;
+            changed = true;
         }
 
-        // If we have a place_id and still need coords, call Google Maps API
-        if (place.latitude.is_none() || place.longitude.is_none())
-            && let Some(pid) = &place.place_id
-        {
+        let needs_details = place.latitude.is_none()
+            || place.longitude.is_none()
+            || place.place_name.is_none()
+            || place.rating.is_none()
+            || place.website.is_none()
+            || place.description.is_none()
+            || place.english_name.is_none();
+
+        if needs_details && let Some(pid) = &place.place_id {
             match client.get_place_details(pid).await {
                 Ok(Some(details)) => {
                     if place.latitude.is_none() {
@@ -211,16 +216,34 @@ pub async fn enrich(
                     if place.url.is_none() {
                         place.url = details.url;
                     }
-                    enriched += 1;
+                    if place.place_name.is_none() {
+                        place.place_name = details.place_name;
+                    }
+                    if place.rating.is_none() {
+                        place.rating = details.rating;
+                    }
+                    if place.website.is_none() {
+                        place.website = details.website;
+                    }
+                    if place.description.is_none() {
+                        place.description = details.description;
+                    }
+                    if place.english_name.is_none() {
+                        place.english_name = details.english_name;
+                    }
+                    changed = true;
                 }
                 Ok(None) => {
-                    skipped += 1;
+                    eprintln!("[enrich] No details for place_id={}", pid);
                 }
                 Err(e) => {
                     eprintln!("[enrich] API error for place_id={}: {}", pid, e);
-                    skipped += 1;
                 }
             }
+        }
+
+        if changed {
+            enriched += 1;
         } else {
             skipped += 1;
         }

@@ -186,14 +186,38 @@ impl Converter {
                 let mut properties = Map::new();
 
                 let name = place
-                    .title
+                    .place_name
                     .as_deref()
-                    .or(place.place_name.as_deref())
+                    .or(place.title.as_deref())
                     .unwrap_or("");
                 properties.insert(
                     "name".to_string(),
                     serde_json::Value::String(name.to_string()),
                 );
+                insert_string_property(&mut properties, "title", &place.title);
+                insert_string_property(&mut properties, "標題", &place.title);
+                insert_string_property(&mut properties, "notes", &place.notes);
+                insert_string_property(&mut properties, "筆記", &place.notes);
+                insert_string_property(&mut properties, "url", &place.url);
+                insert_string_property(&mut properties, "網址", &place.url);
+                insert_string_property(&mut properties, "tags", &place.tags);
+                insert_string_property(&mut properties, "標籤", &place.tags);
+                insert_string_property(&mut properties, "comments", &place.comments);
+                insert_string_property(&mut properties, "留言", &place.comments);
+                insert_string_property(&mut properties, "latitude", &place.latitude);
+                insert_string_property(&mut properties, "緯度", &place.latitude);
+                insert_string_property(&mut properties, "longitude", &place.longitude);
+                insert_string_property(&mut properties, "經度", &place.longitude);
+                insert_string_property(&mut properties, "place_name", &place.place_name);
+                insert_string_property(&mut properties, "地點名稱", &place.place_name);
+                insert_string_property(&mut properties, "rating", &place.rating);
+                insert_string_property(&mut properties, "星級評分", &place.rating);
+                insert_string_property(&mut properties, "website", &place.website);
+                insert_string_property(&mut properties, "網站", &place.website);
+                insert_string_property(&mut properties, "poi_description", &place.description);
+                insert_string_property(&mut properties, "簡介", &place.description);
+                insert_string_property(&mut properties, "english_name", &place.english_name);
+                insert_string_property(&mut properties, "英文名稱", &place.english_name);
 
                 let mut desc_lines = Vec::new();
 
@@ -285,6 +309,18 @@ impl Converter {
             features,
             foreign_members: None,
         }
+    }
+}
+
+fn insert_string_property(
+    properties: &mut Map<String, serde_json::Value>,
+    key: &str,
+    value: &Option<String>,
+) {
+    if let Some(value) = value
+        && !value.is_empty()
+    {
+        properties.insert(key.to_string(), serde_json::Value::String(value.clone()));
     }
 }
 

@@ -147,12 +147,12 @@ pub async fn confirm(
                 comments: None,
                 latitude: p.latitude.map(|v| v.to_string()),
                 longitude: p.longitude.map(|v| v.to_string()),
-                place_name: None,
-                rating: None,
-                website: None,
-                description: p.address.clone(),
+                place_name: p.place_name.clone(),
+                rating: p.rating.clone(),
+                website: p.website.clone(),
+                description: p.description.clone().or_else(|| p.address.clone()),
                 original_name: None,
-                english_name: None,
+                english_name: p.english_name.clone(),
                 place_id: p.place_id.clone(),
             }
         })
