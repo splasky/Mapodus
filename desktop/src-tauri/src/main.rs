@@ -25,6 +25,11 @@ impl Default for DesktopConfig {
 
 fn main() {
     dotenvy::dotenv().ok();
+    // SAFETY: This runs during process startup before the embedded backend is
+    // started, so no other application threads read environment variables yet.
+    unsafe {
+        std::env::set_var("GMAP_TO_UMAP_DESKTOP", "1");
+    }
     if let Err(error) = load_desktop_config() {
         eprintln!("Failed to load desktop config: {}", error);
     }

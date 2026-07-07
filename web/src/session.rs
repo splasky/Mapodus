@@ -12,6 +12,8 @@ pub struct AppSession {
     pub umap_url: Option<String>,
     pub google_places: Option<Vec<GoogleSavedPlace>>,
     pub transfer_mode: Option<String>,
+    pub session_google_maps_api_key: Option<String>,
+    pub session_umap_password: Option<String>,
 }
 
 impl AppSession {
