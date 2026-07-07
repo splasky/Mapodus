@@ -143,14 +143,41 @@ impl PlacesApiClient {
             if let Some(fallback) = fallback_details {
                 details.apply_missing(fallback);
             }
+            self.apply_uri_text_search_details(uri, &mut details).await;
             return Ok(Some(details));
         }
 
-        if fallback_details.is_some() || is_legacy_feature_id {
-            return Ok(fallback_details);
+        if let Some(mut details) = fallback_details {
+            self.apply_uri_text_search_details(uri, &mut details).await;
+            return Ok(Some(details));
+        }
+
+        if is_legacy_feature_id {
+            return Ok(None);
         }
 
         self.text_search(uri).await
+    }
+
+    async fn apply_uri_text_search_details(&self, uri: &str, details: &mut PlaceApiDetails) {
+        if details.google_place_details.is_some() {
+            return;
+        }
+
+        match self.text_search(uri).await {
+            Ok(Some(text_search_details)) => {
+                if details.can_merge_google_place_details(&text_search_details) {
+                    details.apply_missing(text_search_details);
+                }
+            }
+            Ok(None) => {}
+            Err(error) => {
+                eprintln!(
+                    "[places_api] URI Text Search failed for Google Maps URI '{}': {}",
+                    uri, error
+                );
+            }
+        }
     }
 
     async fn google_maps_uri_details(
@@ -247,8 +274,8 @@ impl PlacesApiClient {
             )));
         }
 
-        let place: PlacesApiPlace = serde_json::from_str(&body)?;
-        Ok(PlaceApiDetails::from_place(place))
+        let place: JsonValue = serde_json::from_str(&body)?;
+        Ok(PlaceApiDetails::from_place_value(place))
     }
 
     async fn text_search(&self, query: &str) -> Result<Option<PlaceApiDetails>, AppError> {
@@ -282,13 +309,20 @@ impl PlacesApiClient {
         Ok(search
             .places
             .into_iter()
-            .find_map(PlaceApiDetails::from_place))
+            .find_map(PlaceApiDetails::from_place_value))
     }
 }
 
-const PLACE_DETAILS_FIELD_MASK: &str =
-    "id,displayName,location,rating,websiteUri,googleMapsUri,editorialSummary";
-const TEXT_SEARCH_FIELD_MASK: &str = "places.id,places.displayName,places.location,places.rating,places.websiteUri,places.googleMapsUri,places.editorialSummary";
+const PLACE_DETAILS_FIELD_MASK: &str = concat!(
+    "attributions,id,movedPlace,movedPlaceId,name,",
+    "addressComponents,addressDescriptor,adrFormatAddress,formattedAddress,location,plusCode,postalAddress,shortFormattedAddress,types,viewport,",
+    "accessibilityOptions,businessStatus,containingPlaces,displayName,googleMapsLinks,googleMapsUri,iconBackgroundColor,iconMaskBaseUri,openingDate,primaryType,primaryTypeDisplayName,pureServiceAreaBusiness,subDestinations,timeZone,utcOffsetMinutes"
+);
+const TEXT_SEARCH_FIELD_MASK: &str = concat!(
+    "places.attributions,places.id,places.movedPlace,places.movedPlaceId,places.name,",
+    "places.addressComponents,places.addressDescriptor,places.adrFormatAddress,places.formattedAddress,places.location,places.plusCode,places.postalAddress,places.shortFormattedAddress,places.types,places.viewport,",
+    "places.accessibilityOptions,places.businessStatus,places.containingPlaces,places.displayName,places.googleMapsLinks,places.googleMapsUri,places.iconBackgroundColor,places.iconMaskBaseUri,places.openingDate,places.primaryType,places.primaryTypeDisplayName,places.pureServiceAreaBusiness,places.subDestinations,places.timeZone,places.utcOffsetMinutes"
+);
 
 #[derive(Debug, Clone)]
 struct PlaceApiDetails {
@@ -300,19 +334,22 @@ struct PlaceApiDetails {
     website: Option<String>,
     google_maps_url: Option<String>,
     description: Option<String>,
+    google_place_details: Option<JsonValue>,
 }
 
 impl PlaceApiDetails {
-    fn from_place(place: PlacesApiPlace) -> Option<Self> {
+    fn from_place_value(value: JsonValue) -> Option<Self> {
+        let place: PlacesApiPlace = serde_json::from_value(value.clone()).ok()?;
         Some(Self {
             id: place.id,
             display_name: place.display_name.and_then(|name| name.text),
             latitude: place.location.as_ref().map(|location| location.latitude),
             longitude: place.location.as_ref().map(|location| location.longitude),
-            rating: place.rating.map(format_rating),
-            website: place.website_uri,
+            rating: None,
+            website: None,
             google_maps_url: place.google_maps_uri,
-            description: place.editorial_summary.and_then(|summary| summary.text),
+            description: None,
+            google_place_details: Some(value),
         })
     }
 
@@ -329,6 +366,7 @@ impl PlaceApiDetails {
                 latitude, longitude
             )),
             description: None,
+            google_place_details: None,
         }
     }
 
@@ -362,6 +400,7 @@ impl PlaceApiDetails {
                 .and_then(JsonValue::as_str)
                 .map(str::to_string),
             description: extract_google_maps_preview_description(place),
+            google_place_details: None,
         })
         .filter(|details| details.has_any_data())
     }
@@ -401,6 +440,29 @@ impl PlaceApiDetails {
         if self.description.is_none() {
             self.description = fallback.description;
         }
+        if self.google_place_details.is_none() {
+            self.google_place_details = fallback.google_place_details;
+        }
+    }
+
+    fn can_merge_google_place_details(&self, details: &Self) -> bool {
+        match (
+            self.latitude,
+            self.longitude,
+            details.latitude,
+            details.longitude,
+        ) {
+            (
+                Some(existing_latitude),
+                Some(existing_longitude),
+                Some(details_latitude),
+                Some(details_longitude),
+            ) => {
+                (existing_latitude - details_latitude).abs() <= 0.001
+                    && (existing_longitude - details_longitude).abs() <= 0.001
+            }
+            _ => true,
+        }
     }
 }
 
@@ -410,16 +472,13 @@ struct PlacesApiPlace {
     id: Option<String>,
     display_name: Option<LocalizedText>,
     location: Option<PlacesApiLocation>,
-    rating: Option<f64>,
-    website_uri: Option<String>,
     google_maps_uri: Option<String>,
-    editorial_summary: Option<LocalizedText>,
 }
 
 #[derive(Debug, Deserialize)]
 struct TextSearchResponse {
     #[serde(default)]
-    places: Vec<PlacesApiPlace>,
+    places: Vec<JsonValue>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -437,9 +496,7 @@ fn needs_places_api_enrichment(place: &GooglePlace) -> bool {
     place.latitude.is_none()
         || place.longitude.is_none()
         || place.place_name.is_none()
-        || place.rating.is_none()
-        || place.website.is_none()
-        || place.description.is_none()
+        || place.url.is_none()
 }
 
 fn apply_places_api_details(place: &mut GooglePlace, details: PlaceApiDetails) {
@@ -466,6 +523,9 @@ fn apply_places_api_details(place: &mut GooglePlace, details: PlaceApiDetails) {
     }
     if place.description.is_none() {
         place.description = details.description;
+    }
+    if place.google_place_details.is_none() {
+        place.google_place_details = details.google_place_details;
     }
 }
 
@@ -615,7 +675,11 @@ fn extract_place_id_after(input: &str, marker: &str) -> Option<String> {
 
 fn normalize_places_api_place_id(input: &str) -> Option<&str> {
     let trimmed = input.trim().trim_start_matches("places/").trim();
-    if trimmed.is_empty() || trimmed.starts_with("0x") || trimmed.contains(':') {
+    if trimmed.is_empty()
+        || trimmed.starts_with('/')
+        || trimmed.starts_with("0x")
+        || trimmed.contains(':')
+    {
         return None;
     }
     Some(trimmed)
@@ -778,6 +842,9 @@ mod tests {
                 "rating": 4.7,
                 "websiteUri": "https://example.com",
                 "googleMapsUri": "https://maps.google.com/?cid=123",
+                "businessStatus": "OPERATIONAL",
+                "primaryType": "restaurant",
+                "primaryTypeDisplayName": {"text": "餐廳", "languageCode": "zh-TW"},
                 "editorialSummary": {"text": "測試簡介"}
             }]
         }))
@@ -786,14 +853,32 @@ mod tests {
         let details = response
             .places
             .into_iter()
-            .find_map(PlaceApiDetails::from_place)
+            .find_map(PlaceApiDetails::from_place_value)
             .unwrap();
 
         assert_eq!(details.display_name.as_deref(), Some("測試地點"));
         assert_eq!(details.latitude, Some(24.1));
         assert_eq!(details.longitude, Some(120.2));
-        assert_eq!(details.rating.as_deref(), Some("4.7"));
-        assert_eq!(details.website.as_deref(), Some("https://example.com"));
+        assert_eq!(
+            details.google_maps_url.as_deref(),
+            Some("https://maps.google.com/?cid=123")
+        );
+        assert_eq!(details.rating, None);
+        assert_eq!(details.website, None);
+        assert_eq!(details.description, None);
+        let google_place_details = details.google_place_details.as_ref().unwrap();
+        assert_eq!(
+            google_place_details
+                .get("primaryType")
+                .and_then(JsonValue::as_str),
+            Some("restaurant")
+        );
+        assert_eq!(
+            google_place_details
+                .get("businessStatus")
+                .and_then(JsonValue::as_str),
+            Some("OPERATIONAL")
+        );
     }
 
     #[test]
@@ -849,6 +934,7 @@ mod tests {
             original_name: None,
             english_name: None,
             place_id: None,
+            google_place_details: None,
         };
 
         apply_places_api_details(
@@ -862,6 +948,10 @@ mod tests {
                 website: Some("https://example.com".to_string()),
                 google_maps_url: Some("https://maps.google.com/?cid=123".to_string()),
                 description: Some("API description".to_string()),
+                google_place_details: Some(serde_json::json!({
+                    "id": "places/ChIJSANITIZED",
+                    "displayName": {"text": "API Name"}
+                })),
             },
         );
 
@@ -874,6 +964,109 @@ mod tests {
             place.url.as_deref(),
             Some("https://maps.google.com/?cid=123")
         );
+        assert!(place.google_place_details.is_some());
+    }
+
+    #[test]
+    fn skips_places_that_already_have_basic_umap_fields() {
+        let place = GooglePlace {
+            title: Some("Saved title".to_string()),
+            notes: None,
+            url: Some("https://www.google.com/maps/place/?q=place_id:ChIJSANITIZED".to_string()),
+            tags: None,
+            comments: None,
+            latitude: Some("24.1".to_string()),
+            longitude: Some("120.2".to_string()),
+            place_name: Some("Existing place name".to_string()),
+            rating: None,
+            website: None,
+            description: None,
+            original_name: None,
+            english_name: None,
+            place_id: Some("ChIJSANITIZED".to_string()),
+            google_place_details: None,
+        };
+
+        assert!(!needs_places_api_enrichment(&place));
+    }
+
+    #[test]
+    fn enriches_places_missing_basic_umap_fields() {
+        let place = GooglePlace {
+            title: Some("Saved title".to_string()),
+            notes: None,
+            url: Some("https://www.google.com/maps/place/?q=place_id:ChIJSANITIZED".to_string()),
+            tags: None,
+            comments: None,
+            latitude: Some("24.1".to_string()),
+            longitude: None,
+            place_name: Some("Existing place name".to_string()),
+            rating: None,
+            website: None,
+            description: None,
+            original_name: None,
+            english_name: None,
+            place_id: Some("ChIJSANITIZED".to_string()),
+            google_place_details: None,
+        };
+
+        assert!(needs_places_api_enrichment(&place));
+    }
+
+    #[test]
+    fn merges_google_pro_properties_when_text_search_location_matches() {
+        let existing = PlaceApiDetails {
+            id: None,
+            display_name: Some("Existing".to_string()),
+            latitude: Some(24.7994433),
+            longitude: Some(120.9730098),
+            rating: None,
+            website: None,
+            google_maps_url: None,
+            description: None,
+            google_place_details: None,
+        };
+        let details = PlaceApiDetails {
+            id: Some("places/ChIJSANITIZED".to_string()),
+            display_name: Some("API".to_string()),
+            latitude: Some(24.7994434),
+            longitude: Some(120.9730099),
+            rating: None,
+            website: None,
+            google_maps_url: Some("https://maps.google.com/?cid=123".to_string()),
+            description: None,
+            google_place_details: Some(serde_json::json!({"id": "places/ChIJSANITIZED"})),
+        };
+
+        assert!(existing.can_merge_google_place_details(&details));
+    }
+
+    #[test]
+    fn rejects_google_pro_properties_when_text_search_location_differs() {
+        let existing = PlaceApiDetails {
+            id: None,
+            display_name: Some("Existing".to_string()),
+            latitude: Some(24.7994433),
+            longitude: Some(120.9730098),
+            rating: None,
+            website: None,
+            google_maps_url: None,
+            description: None,
+            google_place_details: None,
+        };
+        let details = PlaceApiDetails {
+            id: Some("places/ChIJSANITIZED".to_string()),
+            display_name: Some("Wrong".to_string()),
+            latitude: Some(24.7850264),
+            longitude: Some(121.0132933),
+            rating: None,
+            website: None,
+            google_maps_url: Some("https://maps.google.com/?cid=123".to_string()),
+            description: None,
+            google_place_details: Some(serde_json::json!({"id": "places/ChIJSANITIZED"})),
+        };
+
+        assert!(!existing.can_merge_google_place_details(&details));
     }
 
     #[test]
@@ -908,6 +1101,25 @@ mod tests {
         );
 
         assert_eq!(place_id, None);
+    }
+
+    #[test]
+    fn ignores_google_knowledge_graph_ids_as_places_api_place_ids() {
+        assert_eq!(normalize_places_api_place_id("/g/11jz959qng"), None);
+        assert_eq!(normalize_places_api_place_id("/m/03h3wxp"), None);
+
+        assert_eq!(
+            extract_places_api_place_id(
+                "https://www.google.com/maps/place/Test?place_id=%2Fg%2F11jz959qng"
+            ),
+            None
+        );
+        assert_eq!(
+            extract_places_api_place_id(
+                "https://www.google.com/maps/place/Test?query_place_id=%2Fm%2F03h3wxp"
+            ),
+            None
+        );
     }
 
     #[test]
@@ -983,6 +1195,7 @@ mod tests {
             original_name: None,
             english_name: None,
             place_id: None,
+            google_place_details: None,
         };
 
         let details = client.resolve_place(&place).await.unwrap().unwrap();
