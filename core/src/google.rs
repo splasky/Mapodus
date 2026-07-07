@@ -3,6 +3,68 @@ use csv;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportLocale {
+    Auto,
+    En,
+    ZhTw,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum CsvField {
+    Title,
+    Notes,
+    Url,
+    Tags,
+    Comments,
+    Latitude,
+    Longitude,
+    PlaceName,
+    Rating,
+    Website,
+    Description,
+    OriginalName,
+    EnglishName,
+}
+
+impl CsvField {
+    fn canonical_headers(self) -> &'static [&'static str] {
+        match self {
+            CsvField::Title => &["title"],
+            CsvField::Notes => &["notes", "note"],
+            CsvField::Url => &["url"],
+            CsvField::Tags => &["tags", "tag"],
+            CsvField::Comments => &["comments", "comment"],
+            CsvField::Latitude => &["latitude", "lat"],
+            CsvField::Longitude => &["longitude", "lng", "lon"],
+            CsvField::PlaceName => &["place name", "place"],
+            CsvField::Rating => &["rating"],
+            CsvField::Website => &["website", "web site"],
+            CsvField::Description => &["description"],
+            CsvField::OriginalName => &["original name"],
+            CsvField::EnglishName => &["english name"],
+        }
+    }
+
+    fn zh_tw_headers(self) -> &'static [&'static str] {
+        match self {
+            CsvField::Title => &["標題"],
+            CsvField::Notes => &["筆記"],
+            CsvField::Url => &["網址"],
+            CsvField::Tags => &["標籤"],
+            CsvField::Comments => &["留言"],
+            CsvField::Latitude => &["緯度"],
+            CsvField::Longitude => &["經度"],
+            CsvField::PlaceName => &["地點名稱"],
+            CsvField::Rating => &["星級評分"],
+            CsvField::Website => &["網站"],
+            CsvField::Description => &["簡介"],
+            CsvField::OriginalName => &["原文名稱"],
+            CsvField::EnglishName => &["英文名稱"],
+        }
+    }
+}
+
 /// Extract coordinates from a Google Maps URL.
 /// Handles formats:
 ///   - `https://maps.google.com/?q=lat,lng`
@@ -103,27 +165,30 @@ pub struct GooglePlace {
 
 impl GooglePlace {
     fn find_header_index(
-        header_map: &std::collections::HashMap<String, usize>,
-        field_name: &str,
+        headers: &[NormalizedHeader],
+        field: CsvField,
+        locale: ImportLocale,
     ) -> Option<usize> {
-        let aliases = header_aliases(field_name);
-
-        aliases
-            .iter()
-            .find_map(|alias| header_map.get(&normalize_header(alias)).copied())
+        find_header_by_aliases(headers, field.canonical_headers())
+            .or_else(|| find_header_by_english_hint(headers, field.canonical_headers()))
             .or_else(|| {
-                header_map
-                    .iter()
-                    .find(|(header, _)| {
-                        aliases
-                            .iter()
-                            .any(|alias| header.contains(&normalize_header(alias)))
-                    })
-                    .map(|(_, &idx)| idx)
+                if matches!(locale, ImportLocale::Auto | ImportLocale::ZhTw) {
+                    find_header_by_aliases(headers, field.zh_tw_headers())
+                } else {
+                    None
+                }
             })
     }
 
     pub fn from_csv_record(record: &csv::StringRecord, headers: &csv::StringRecord) -> Self {
+        Self::from_csv_record_with_locale(record, headers, ImportLocale::Auto)
+    }
+
+    pub fn from_csv_record_with_locale(
+        record: &csv::StringRecord,
+        headers: &csv::StringRecord,
+        locale: ImportLocale,
+    ) -> Self {
         let mut place = GooglePlace {
             title: None,
             notes: None,
@@ -141,33 +206,37 @@ impl GooglePlace {
             place_id: None,
         };
 
-        let header_map = headers
+        let normalized_headers = headers
             .iter()
             .enumerate()
-            .map(|(i, header)| (normalize_header(header), i))
-            .collect::<std::collections::HashMap<String, usize>>();
+            .map(|(index, header)| NormalizedHeader::new(index, header))
+            .collect::<Vec<_>>();
 
         macro_rules! set_field {
-            ($field:ident, $header:expr) => {
-                if let Some(idx) = Self::find_header_index(&header_map, $header) {
-                    place.$field = record.get(idx).map(|s| s.to_string());
+            ($field:ident, $csv_field:expr) => {
+                if let Some(idx) = Self::find_header_index(&normalized_headers, $csv_field, locale)
+                {
+                    place.$field = record_value(record, idx);
                 }
             };
         }
 
-        set_field!(title, "Title");
-        set_field!(notes, "Notes");
-        set_field!(url, "URL");
-        set_field!(tags, "Tags");
-        set_field!(comments, "Comments");
-        set_field!(latitude, "Latitude");
-        set_field!(longitude, "Longitude");
-        set_field!(place_name, "Place Name");
-        set_field!(rating, "Rating");
-        set_field!(website, "Website");
-        set_field!(description, "Description");
-        set_field!(original_name, "Original Name");
-        set_field!(english_name, "English Name");
+        set_field!(title, CsvField::Title);
+        set_field!(notes, CsvField::Notes);
+        set_field!(url, CsvField::Url);
+        set_field!(tags, CsvField::Tags);
+        set_field!(comments, CsvField::Comments);
+        set_field!(latitude, CsvField::Latitude);
+        set_field!(longitude, CsvField::Longitude);
+        set_field!(place_name, CsvField::PlaceName);
+        set_field!(rating, CsvField::Rating);
+        set_field!(website, CsvField::Website);
+        set_field!(description, CsvField::Description);
+        set_field!(original_name, CsvField::OriginalName);
+        set_field!(english_name, CsvField::EnglishName);
+
+        apply_default_takeout_position_fallback(record, &mut place);
+        apply_url_heuristic_fallback(record, &mut place);
 
         // If lat/lng are missing, try to extract from URL
         if (place.latitude.is_none() || place.longitude.is_none())
@@ -253,80 +322,128 @@ impl GooglePlace {
     }
 }
 
+#[derive(Debug, Clone)]
+struct NormalizedHeader {
+    index: usize,
+    normalized: String,
+    english_hints: Vec<String>,
+}
+
+impl NormalizedHeader {
+    fn new(index: usize, header: &str) -> Self {
+        Self {
+            index,
+            normalized: normalize_header(header),
+            english_hints: english_hints(header),
+        }
+    }
+}
+
 fn normalize_header(header: &str) -> String {
     header
         .trim()
         .to_lowercase()
         .chars()
-        .filter(|ch| {
-            !ch.is_whitespace()
-                && !matches!(
-                    ch,
-                    '(' | ')' | '（' | '）' | '[' | ']' | '【' | '】' | '-' | '_' | '/'
-                )
-        })
+        .filter(|ch| ch.is_alphanumeric())
         .collect()
 }
 
-fn header_aliases(field_name: &str) -> &'static [&'static str] {
-    match field_name {
-        "Title" => &["title", "標題", "标题", "タイトル", "題名", "제목"],
-        "Notes" => &["notes", "note", "筆記", "笔记", "メモ", "ノート", "메모"],
-        "URL" => &["url", "網址", "网址", "リンク", "link"],
-        "Tags" => &["tags", "tag", "標籤", "标签", "タグ", "ラベル", "태그"],
-        "Comments" => &[
-            "comments",
-            "comment",
-            "留言",
-            "コメント",
-            "コメント欄",
-            "댓글",
-        ],
-        "Latitude" => &["latitude", "lat", "緯度", "纬度", "緯度latitude", "위도"],
-        "Longitude" => &["longitude", "lng", "lon", "經度", "经度", "経度", "경도"],
-        "Place Name" => &[
-            "place name",
-            "place",
-            "地點名稱",
-            "地点名称",
-            "場所名",
-            "場所の名前",
-            "장소 이름",
-        ],
-        "Rating" => &[
-            "rating",
-            "星級評分",
-            "评分",
-            "評分",
-            "評価",
-            "レーティング",
-            "평점",
-        ],
-        "Website" => &[
-            "website",
-            "web site",
-            "網站",
-            "网站",
-            "ウェブサイト",
-            "サイト",
-        ],
-        "Description" => &["description", "簡介", "简介", "説明", "설명"],
-        "Original Name" => &[
-            "original name",
-            "原文名稱",
-            "原文名称",
-            "元の名前",
-            "원래 이름",
-        ],
-        "English Name" => &[
-            "english name",
-            "英文名稱",
-            "英文名称",
-            "英語名",
-            "영어 이름",
-        ],
-        _ => &[],
+fn english_hints(header: &str) -> Vec<String> {
+    let mut hints = Vec::new();
+    let mut start = None;
+
+    for (index, ch) in header.char_indices() {
+        match ch {
+            '(' | '（' | '[' | '【' => start = Some(index + ch.len_utf8()),
+            ')' | '）' | ']' | '】' => {
+                if let Some(start_index) = start.take() {
+                    let hint = &header[start_index..index];
+                    if hint.is_ascii() {
+                        let normalized = normalize_header(hint);
+                        if !normalized.is_empty() {
+                            hints.push(normalized);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
     }
+
+    hints
+}
+
+fn find_header_by_aliases(headers: &[NormalizedHeader], aliases: &[&str]) -> Option<usize> {
+    aliases
+        .iter()
+        .map(|alias| normalize_header(alias))
+        .find_map(|alias| {
+            headers
+                .iter()
+                .find(|header| header.normalized == alias)
+                .map(|header| header.index)
+        })
+}
+
+fn find_header_by_english_hint(headers: &[NormalizedHeader], aliases: &[&str]) -> Option<usize> {
+    aliases
+        .iter()
+        .map(|alias| normalize_header(alias))
+        .find_map(|alias| {
+            headers
+                .iter()
+                .find(|header| header.english_hints.iter().any(|hint| hint == &alias))
+                .map(|header| header.index)
+        })
+}
+
+fn record_value(record: &csv::StringRecord, index: usize) -> Option<String> {
+    record
+        .get(index)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn apply_default_takeout_position_fallback(record: &csv::StringRecord, place: &mut GooglePlace) {
+    if record.len() < 5 {
+        return;
+    }
+
+    if place.title.is_none() {
+        place.title = record_value(record, 0);
+    }
+    if place.notes.is_none() {
+        place.notes = record_value(record, 1);
+    }
+    if place.url.is_none() {
+        place.url = record_value(record, 2);
+    }
+    if place.tags.is_none() {
+        place.tags = record_value(record, 3);
+    }
+    if place.comments.is_none() {
+        place.comments = record_value(record, 4);
+    }
+}
+
+fn apply_url_heuristic_fallback(record: &csv::StringRecord, place: &mut GooglePlace) {
+    if place.url.is_some() {
+        return;
+    }
+
+    place.url = record
+        .iter()
+        .map(str::trim)
+        .find(|value| looks_like_google_maps_url(value))
+        .map(ToOwned::to_owned);
+}
+
+fn looks_like_google_maps_url(value: &str) -> bool {
+    value.starts_with("https://www.google.com/maps/")
+        || value.starts_with("https://maps.google.com/")
+        || value.starts_with("https://goo.gl/maps/")
+        || value.starts_with("https://maps.app.goo.gl/")
 }
 
 pub fn parse_takeout(path: &str) -> Result<Vec<GooglePlace>> {
@@ -378,29 +495,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_japanese_takeout_headers() {
-        let headers =
-            csv::StringRecord::from(vec!["タイトル", "メモ", "リンク", "タグ", "コメント"]);
+    fn parses_unknown_locale_takeout_headers_by_default_position() {
+        let headers = csv::StringRecord::from(vec![
+            "العنوان",
+            "ملاحظات",
+            "الرابط",
+            "التصنيفات",
+            "التعليقات",
+        ]);
         let record = csv::StringRecord::from(vec![
-            "東京タワー",
-            "夜景",
-            "https://www.google.com/maps/search/35.6586,139.7454",
-            "旅行",
-            "再訪",
+            "برج خليفة",
+            "زيارة",
+            "https://www.google.com/maps/search/25.1972,55.2744",
+            "رحلة",
+            "مساء",
         ]);
 
         let place = GooglePlace::from_csv_record(&record, &headers);
 
-        assert_eq!(place.title.as_deref(), Some("東京タワー"));
-        assert_eq!(place.notes.as_deref(), Some("夜景"));
+        assert_eq!(place.title.as_deref(), Some("برج خليفة"));
+        assert_eq!(place.notes.as_deref(), Some("زيارة"));
         assert_eq!(
             place.url.as_deref(),
-            Some("https://www.google.com/maps/search/35.6586,139.7454")
+            Some("https://www.google.com/maps/search/25.1972,55.2744")
         );
-        assert_eq!(place.tags.as_deref(), Some("旅行"));
-        assert_eq!(place.comments.as_deref(), Some("再訪"));
-        assert_eq!(place.latitude.as_deref(), Some("35.6586"));
-        assert_eq!(place.longitude.as_deref(), Some("139.7454"));
+        assert_eq!(place.tags.as_deref(), Some("رحلة"));
+        assert_eq!(place.comments.as_deref(), Some("مساء"));
+        assert_eq!(place.latitude.as_deref(), Some("25.1972"));
+        assert_eq!(place.longitude.as_deref(), Some("55.2744"));
     }
 
     #[test]
@@ -410,12 +532,12 @@ mod tests {
             "網址",
             "緯度(Latitude)",
             "經度(Longitude)",
-            "場所名",
-            "評価",
-            "ウェブサイト",
-            "説明",
-            "元の名前",
-            "英語名",
+            "地點名稱(Place Name)",
+            "星級評分(Rating)",
+            "網站(Website)",
+            "簡介(Description)",
+            "原文名稱(Original Name)",
+            "英文名稱(English Name)",
         ]);
         let record = csv::StringRecord::from(vec![
             "スカイツリー",
@@ -445,5 +567,22 @@ mod tests {
         assert_eq!(place.original_name.as_deref(), Some("東京スカイツリー"));
         assert_eq!(place.english_name.as_deref(), Some("Tokyo Skytree"));
         assert_eq!(place.place_id.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn finds_google_maps_url_without_recognized_url_header() {
+        let headers = csv::StringRecord::from(vec!["unknown", "also unknown", "still unknown"]);
+        let record = csv::StringRecord::from(vec![
+            "not a url",
+            "https://maps.app.goo.gl/example",
+            "ignored",
+        ]);
+
+        let place = GooglePlace::from_csv_record(&record, &headers);
+
+        assert_eq!(
+            place.url.as_deref(),
+            Some("https://maps.app.goo.gl/example")
+        );
     }
 }
