@@ -148,17 +148,23 @@ mod tests {
         );
         assert_eq!(props.get("rating").and_then(|v| v.as_str()), Some("4"));
         assert_eq!(
-            props.get("english_name").and_then(|v| v.as_str()),
-            Some("6owl door Hsinchu Dongnan Branch")
+            props.get("original_name").and_then(|v| v.as_str()),
+            Some("六扇門時尚湯鍋 新竹東南店")
         );
+        assert_eq!(
+            props.get("原文名稱").and_then(|v| v.as_str()),
+            Some("六扇門時尚湯鍋 新竹東南店")
+        );
+        assert!(!props.contains_key("english_name"));
+        assert!(!props.contains_key("英文名稱"));
         assert!(props.get("website").and_then(|v| v.as_str()).is_some());
 
         let desc = props
             .get("description")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        assert!(desc.contains("名稱: 6owl door Hsinchu Dongnan Branch"));
-        assert!(desc.contains("English: 6owl door Hsinchu Dongnan Branch"));
+        assert!(desc.contains("名稱: 六扇門時尚湯鍋 新竹東南店"));
+        assert!(!desc.contains("English: 6owl door Hsinchu Dongnan Branch"));
 
         let geometry = first_feature.geometry.as_ref().unwrap();
         match &geometry.value {
