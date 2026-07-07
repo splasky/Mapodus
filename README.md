@@ -33,7 +33,7 @@ cd frontend && npm install && npm run build && cd ..
 # Copy .env.example to .env and edit with your settings
 # Optional: UMAP_DEFAULT_URL (default: https://umap.openstreetmap.fr/en/)
 # Optional: GOOGLE_MAPS_API_KEY (resolve missing POI coordinates)
-# Optional: DEV_MODE, DATABASE_URL
+# Optional: DEV_MODE
 
 # Start the server
 cargo run --bin web
