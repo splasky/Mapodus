@@ -53,6 +53,9 @@ client_secret_*.json
 # Frontend build artifacts (hash changes every build)
 web/static/assets/*
 
+# Tauri generated schema files
+desktop/src-tauri/gen/
+
 # opencode config
 opencode.json
 .opencode/
