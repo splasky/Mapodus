@@ -5,24 +5,37 @@
   let umapUrl = $state('https://umap.openstreetmap.fr/en/');
   let username = $state('');
   let password = $state('');
+  let passwordSaved = $state(false);
   let connecting = $state(false);
   let error = $state('');
 
   $effect(() => {
-    apiGet<{ umap_url?: string }>('/umap/status')
+    apiGet<{ umap_default_url: string; umap_account?: string; umap_password_saved: boolean }>('/settings')
       .then(status => {
-        if (status.umap_url) {
-          umapUrl = status.umap_url;
+        if (status.umap_default_url) {
+          umapUrl = status.umap_default_url;
         }
+        username = status.umap_account ?? '';
+        passwordSaved = status.umap_password_saved;
       })
       .catch(() => {
-        // Keep the built-in default if the status request fails.
+        apiGet<{ umap_url?: string }>('/umap/status')
+          .then(status => {
+            if (status.umap_url) {
+              umapUrl = status.umap_url;
+            }
+          })
+          .catch(() => {
+            // Keep the built-in default if the status request fails.
+          });
       });
   });
 
   async function connect() {
-    if (!umapUrl || !username || !password) {
-      error = 'Please fill in all fields';
+    if (!umapUrl || !username || (!password && !passwordSaved)) {
+      error = passwordSaved
+        ? 'Please fill in uMap URL and username'
+        : 'Please fill in all fields';
       return;
     }
     connecting = true;
@@ -56,7 +69,11 @@
   </label>
   <label>
     Password
-    <input type="password" bind:value={password} placeholder="your uMap password" />
+    <input
+      type="password"
+      bind:value={password}
+      placeholder={passwordSaved ? 'Saved password will be used if left blank' : 'your uMap password'}
+    />
   </label>
 
     <button class="primary" onclick={connect} disabled={connecting}>

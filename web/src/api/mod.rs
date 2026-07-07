@@ -1,6 +1,7 @@
 pub mod bookmarks;
 pub mod errors;
 pub mod google_import;
+pub mod settings;
 pub mod umap;
 
 use axum::Router;
@@ -23,6 +24,10 @@ pub fn routes() -> Router {
         .route(
             "/api/bookmarks/auto_enrich",
             axum::routing::post(bookmarks::auto_enrich),
+        )
+        .route(
+            "/api/settings",
+            axum::routing::get(settings::get).post(settings::update),
         )
         .route("/api/umap/connect", axum::routing::post(umap::connect))
         .route("/api/umap/status", axum::routing::get(umap::status))
