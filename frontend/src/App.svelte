@@ -3,9 +3,11 @@
   import GoogleImport from './lib/components/GoogleImport.svelte';
   import Bookmarks from './lib/components/Bookmarks.svelte';
   import ConnectUmap from './lib/components/ConnectUmap.svelte';
+  import Settings from './lib/components/Settings.svelte';
   import Transfer from './lib/components/Transfer.svelte';
 
-  let step = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer'>('upload');
+  let step = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer' | 'settings'>('upload');
+  let previousStep = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer'>('upload');
   let umapConnected = $state(false);
   let bookmarksUploaded = $state(false);
   let selectedIds = $state<number[]>([]);
@@ -35,6 +37,15 @@
     bookmarksUploaded = false;
     selectedIds = [];
   }
+  function openSettings() {
+    if (step !== 'settings') {
+      previousStep = step;
+    }
+    step = 'settings';
+  }
+  function closeSettings() {
+    step = previousStep;
+  }
 
   function goPrev() {
     switch (step) {
@@ -56,11 +67,13 @@
 
 <div class="layout">
   <div class="hero">
+    <button class="settings-button" onclick={openSettings} aria-label="Open settings">⚙️</button>
     <h1>google-maps-to-umap</h1>
     <p>Convert Google Maps saved places to uMap</p>
   </div>
 
-  <div class="steps">
+  {#if step !== 'settings'}
+    <div class="steps">
     <div class="step {step === 'upload' || step === 'google-import' ? 'active' : ''} {bookmarksUploaded ? 'done' : ''}">
       <span class="step-num">1</span> Import
     </div>
@@ -74,8 +87,11 @@
       <span class="step-num">4</span> Transfer
     </div>
   </div>
+  {/if}
 
-  {#if step === 'upload'}
+  {#if step === 'settings'}
+    <Settings onBack={closeSettings} />
+  {:else if step === 'upload'}
     <Upload {onUpload} {onGoogleImport} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'google-import'}
     <GoogleImport onImport={onImportDone} onPrev={goPrev} onNext={goNext} />
@@ -94,6 +110,29 @@
     gap: 0.5rem;
     margin-bottom: 2rem;
     flex-wrap: wrap;
+  }
+
+  .hero {
+    position: relative;
+  }
+
+  .settings-button {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: white;
+    color: #334155;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .settings-button:hover {
+    border-color: #2563eb;
+    color: #2563eb;
   }
   .step {
     display: flex;

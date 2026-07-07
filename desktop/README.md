@@ -29,10 +29,18 @@ Example:
 
 ```toml
 umap_default_url = "https://umap.openstreetmap.fr/en/"
+umap_account = "optional-user-name"
+locale = "en"
+dev_mode = false
 ```
 
-Do not store Google cookies, uMap passwords, OAuth tokens, or session cookies in
-this config file.
+Do not store Google cookies, uMap passwords, Google Maps API keys, OAuth tokens,
+or session cookies in this config file. The desktop app stores sensitive values
+with the OS credential vault/keychain:
+
+- macOS: Keychain
+- Windows: Credential Manager
+- Linux: Secret Service / libsecret-compatible keyring
 
 ## Release Artifacts
 

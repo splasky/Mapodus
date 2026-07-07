@@ -1,5 +1,6 @@
 pub mod api;
 pub mod session;
+pub mod settings;
 
 use std::net::SocketAddr;
 

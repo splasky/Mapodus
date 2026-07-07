@@ -11,6 +11,7 @@ use umap_core::umap::UmapClient;
 
 use crate::api::errors::ApiError;
 use crate::session::AppSession;
+use crate::settings;
 
 #[derive(Deserialize)]
 pub struct ConnectRequest {
@@ -59,11 +60,15 @@ pub async fn connect(
     session: Session,
     Json(req): Json<ConnectRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let auth = umap_core::umap::login::proxy_login(&req.umap_url, &req.username, &req.password)
+    let app = AppSession::from_session(&session).await;
+    let password = connect_password(&req.password, &app)
+        .ok_or_else(|| ApiError::BadRequest("uMap password is required".into()))?;
+
+    let auth = umap_core::umap::login::proxy_login(&req.umap_url, &req.username, &password)
         .await
         .map_err(|e| ApiError::Unauthorized(format!("uMap login failed: {}", e)))?;
 
-    let mut app = AppSession::from_session(&session).await;
+    let mut app = app;
     app.umap_auth = Some(auth);
     app.umap_url = Some(req.umap_url);
     app.save_to_session(&session).await;
@@ -83,12 +88,20 @@ pub async fn status(session: Session) -> Result<impl IntoResponse, ApiError> {
 }
 
 fn default_umap_url() -> String {
-    std::env::var("UMAP_DEFAULT_URL")
-        .or_else(|_| std::env::var("UMAP_URL"))
-        .ok()
-        .map(|url| url.trim().to_string())
-        .filter(|url| !url.is_empty())
-        .unwrap_or_else(|| "https://umap.openstreetmap.fr/en/".to_string())
+    settings::default_umap_url()
+}
+
+fn connect_password(request_password: &str, app: &AppSession) -> Option<String> {
+    let request_password = request_password.trim();
+    if !request_password.is_empty() {
+        return Some(request_password.to_string());
+    }
+
+    if settings::is_desktop_mode() {
+        settings::umap_password_from_keychain()
+    } else {
+        app.session_umap_password.clone()
+    }
 }
 
 async fn create_and_upload_map(
@@ -157,7 +170,11 @@ pub async fn transfer(
         return Err(ApiError::BadRequest("No bookmarks selected".into()));
     }
 
-    let places_api_stats = enrich_with_places_api_if_configured(&mut selected).await?;
+    let places_api_stats = enrich_with_places_api_if_configured(
+        &mut selected,
+        app.session_google_maps_api_key.clone(),
+    )
+    .await?;
     let mode = app.transfer_mode.as_deref().unwrap_or("single");
 
     if mode == "per_list" {
@@ -245,8 +262,9 @@ pub async fn transfer(
 
 async fn enrich_with_places_api_if_configured(
     places: &mut [GooglePlace],
+    session_api_key: Option<String>,
 ) -> Result<Option<PlacesApiEnrichmentStats>, ApiError> {
-    let client = PlacesApiClient::with_optional_api_key(places_api_key());
+    let client = PlacesApiClient::with_optional_api_key(places_api_key(session_api_key));
     client
         .enrich_places(places)
         .await
@@ -254,10 +272,17 @@ async fn enrich_with_places_api_if_configured(
         .map_err(|e| ApiError::Internal(format!("Google Maps URI enrichment failed: {}", e)))
 }
 
-fn places_api_key() -> Option<String> {
+fn places_api_key(session_api_key: Option<String>) -> Option<String> {
     std::env::var("GOOGLE_MAPS_API_KEY")
         .ok()
         .filter(|key| !key.trim().is_empty())
+        .or_else(|| {
+            if settings::is_desktop_mode() {
+                settings::google_maps_api_key_from_keychain()
+            } else {
+                session_api_key
+            }
+        })
 }
 
 fn ensure_has_features(
