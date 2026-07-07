@@ -116,6 +116,7 @@ pub struct GooglePlace {
     pub original_name: Option<String>,
     pub english_name: Option<String>,
     pub place_id: Option<String>,
+    pub google_place_details: Option<serde_json::Value>,
 }
 
 impl GooglePlace {
@@ -176,6 +177,7 @@ impl GooglePlace {
             original_name: None,
             english_name: None,
             place_id: None,
+            google_place_details: None,
         };
 
         let header_map = headers
@@ -286,6 +288,7 @@ impl GooglePlace {
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
             place_id: None,
+            google_place_details: properties.get("google_place_details").cloned(),
         }
     }
 }

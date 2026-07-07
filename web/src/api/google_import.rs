@@ -151,9 +151,14 @@ pub async fn confirm(
                 rating: p.rating.clone(),
                 website: p.website.clone(),
                 description: p.description.clone().or_else(|| p.address.clone()),
-                original_name: None,
+                original_name: p
+                    .original_name
+                    .clone()
+                    .or_else(|| p.title.clone())
+                    .or_else(|| p.place_name.clone()),
                 english_name: p.english_name.clone(),
                 place_id: p.place_id.clone(),
+                google_place_details: None,
             }
         })
         .collect();

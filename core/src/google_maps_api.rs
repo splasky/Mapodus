@@ -14,6 +14,7 @@ pub struct GoogleSavedPlace {
     pub rating: Option<String>,
     pub website: Option<String>,
     pub description: Option<String>,
+    pub original_name: Option<String>,
     pub english_name: Option<String>,
     pub place_id: Option<String>,
     pub list: String,
@@ -223,6 +224,15 @@ impl GoogleMapsClient {
         &self,
         place_id: &str,
     ) -> Result<Option<GooglePlaceDetails>, crate::error::AppError> {
+        let place_id = place_id.trim();
+        if !is_preview_place_details_id(place_id) {
+            eprintln!(
+                "[place_details] Skipping unsupported preview place_id '{}'",
+                place_id
+            );
+            return Ok(None);
+        }
+
         let pb = format!("!1s{}!2e1", place_id);
         let url = "https://www.google.com/maps/preview/place";
         let response = self
@@ -338,6 +348,11 @@ impl GoogleMapsClient {
             }
         }
     }
+}
+
+fn is_preview_place_details_id(place_id: &str) -> bool {
+    let place_id = place_id.trim();
+    !place_id.is_empty() && !place_id.starts_with('/') && !place_id.chars().any(char::is_whitespace)
 }
 
 impl GoogleSavedPlace {
@@ -801,6 +816,7 @@ fn parse_getlist_places(
             rating: extract_entry_rating(arr),
             website: extract_entry_website(arr),
             description: extract_entry_description(arr, name),
+            original_name: Some(name.to_string()),
             english_name: extract_entry_english_name(arr, name),
             place_id,
             list: list_name.to_string(),
@@ -1459,6 +1475,7 @@ mod tests {
         assert_eq!(place.title.as_deref(), Some("SEE TEA戲茶"));
         assert_eq!(place.notes.as_deref(), Some("user note"));
         assert_eq!(place.place_name.as_deref(), Some("SEE TEA戲茶"));
+        assert_eq!(place.original_name.as_deref(), Some("SEE TEA戲茶"));
         assert_eq!(place.place_id.as_deref(), Some("ChIJSANITIZED"));
         assert_eq!(place.rating.as_deref(), Some("4.7"));
         assert_eq!(
@@ -1487,6 +1504,7 @@ mod tests {
             rating: None,
             website: None,
             description: None,
+            original_name: Some("Saved title".to_string()),
             english_name: None,
             place_id: Some("ChIJSANITIZED".to_string()),
             list: "Favorites".to_string(),
@@ -1511,5 +1529,19 @@ mod tests {
         assert_eq!(place.website.as_deref(), Some("https://example.com"));
         assert_eq!(place.description.as_deref(), Some("測試簡介內容。"));
         assert_eq!(place.english_name.as_deref(), Some("Detail English"));
+    }
+
+    #[test]
+    fn rejects_unsupported_preview_place_detail_ids() {
+        assert!(is_preview_place_details_id("ChIJSANITIZED"));
+        assert!(is_preview_place_details_id(
+            "0x34693d4c1234567:0xabcdef1234567890"
+        ));
+
+        assert!(!is_preview_place_details_id(""));
+        assert!(!is_preview_place_details_id("   "));
+        assert!(!is_preview_place_details_id("/g/1tf26dh2"));
+        assert!(!is_preview_place_details_id("/m/03cyfr9"));
+        assert!(!is_preview_place_details_id("ChIJ WITH SPACE"));
     }
 }
