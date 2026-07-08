@@ -15,6 +15,7 @@ pub struct PlacesApiEnrichmentStats {
 pub struct PlacesApiClient {
     client: reqwest::Client,
     api_key: Option<String>,
+    locale: String,
 }
 
 impl PlacesApiClient {
@@ -23,9 +24,17 @@ impl PlacesApiClient {
     }
 
     pub fn with_optional_api_key(api_key: Option<String>) -> Self {
+        Self::with_optional_api_key_and_locale(api_key, "en")
+    }
+
+    pub fn with_optional_api_key_and_locale(
+        api_key: Option<String>,
+        locale: impl Into<String>,
+    ) -> Self {
         Self {
             client: reqwest::Client::new(),
             api_key: api_key.filter(|key| !key.trim().is_empty()),
+            locale: normalize_locale(&locale.into()),
         }
     }
 
@@ -192,7 +201,7 @@ impl PlacesApiClient {
                 reqwest::header::USER_AGENT,
                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
             )
-            .header(reqwest::header::ACCEPT_LANGUAGE, "zh-TW,zh;q=0.9,en;q=0.8")
+            .header(reqwest::header::ACCEPT_LANGUAGE, self.accept_language())
             .send()
             .await?;
 
@@ -233,7 +242,7 @@ impl PlacesApiClient {
                 reqwest::header::USER_AGENT,
                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
             )
-            .header(reqwest::header::ACCEPT_LANGUAGE, "zh-TW,zh;q=0.9,en;q=0.8")
+            .header(reqwest::header::ACCEPT_LANGUAGE, self.accept_language())
             .send()
             .await?;
 
@@ -260,7 +269,7 @@ impl PlacesApiClient {
         let response = self
             .client
             .get(url)
-            .query(&[("key", api_key)])
+            .query(&[("key", api_key), ("languageCode", self.locale.as_str())])
             .header("X-Goog-FieldMask", PLACE_DETAILS_FIELD_MASK)
             .send()
             .await?;
@@ -290,8 +299,7 @@ impl PlacesApiClient {
             .header("X-Goog-FieldMask", TEXT_SEARCH_FIELD_MASK)
             .json(&serde_json::json!({
                 "textQuery": query,
-                "languageCode": "zh-TW",
-                "regionCode": "TW",
+                "languageCode": self.locale.as_str(),
             }))
             .send()
             .await?;
@@ -310,6 +318,35 @@ impl PlacesApiClient {
             .places
             .into_iter()
             .find_map(PlaceApiDetails::from_place_value))
+    }
+
+    fn accept_language(&self) -> String {
+        accept_language(&self.locale)
+    }
+}
+
+fn normalize_locale(locale: &str) -> String {
+    let trimmed = locale.trim();
+    if trimmed.is_empty() {
+        return "en".to_string();
+    }
+
+    if trimmed.eq_ignore_ascii_case("zh-tw") || trimmed.eq_ignore_ascii_case("zh-hant-tw") {
+        return "zh-TW".to_string();
+    }
+
+    if trimmed.to_ascii_lowercase().starts_with("en") {
+        return "en".to_string();
+    }
+
+    trimmed.to_string()
+}
+
+fn accept_language(locale: &str) -> String {
+    match normalize_locale(locale).as_str() {
+        "zh-TW" => "zh-TW,zh;q=0.9,en;q=0.8".to_string(),
+        "en" => "en,zh-TW;q=0.6".to_string(),
+        other => format!("{other},en;q=0.8"),
     }
 }
 
@@ -500,6 +537,9 @@ fn needs_places_api_enrichment(place: &GooglePlace) -> bool {
 }
 
 fn apply_places_api_details(place: &mut GooglePlace, details: PlaceApiDetails) {
+    if place.original_name.is_none() {
+        place.original_name = place.title.clone().or_else(|| place.place_name.clone());
+    }
     if place.latitude.is_none() {
         place.latitude = details.latitude.map(|v| v.to_string());
     }
@@ -957,6 +997,7 @@ mod tests {
 
         assert_eq!(place.latitude.as_deref(), Some("1.0"));
         assert_eq!(place.longitude.as_deref(), Some("3"));
+        assert_eq!(place.original_name.as_deref(), Some("Original"));
         assert_eq!(place.place_name.as_deref(), Some("API Name"));
         assert_eq!(place.rating.as_deref(), Some("4.5"));
         assert_eq!(place.website.as_deref(), Some("https://example.com"));
@@ -1067,6 +1108,60 @@ mod tests {
         };
 
         assert!(!existing.can_merge_google_place_details(&details));
+    }
+
+    #[test]
+    fn normalizes_supported_locale_values() {
+        assert_eq!(normalize_locale(""), "en");
+        assert_eq!(normalize_locale("en-US"), "en");
+        assert_eq!(normalize_locale("zh-hant-tw"), "zh-TW");
+        assert_eq!(normalize_locale("ja-JP"), "ja-JP");
+    }
+
+    #[test]
+    fn builds_accept_language_from_locale() {
+        assert_eq!(accept_language("zh-TW"), "zh-TW,zh;q=0.9,en;q=0.8");
+        assert_eq!(accept_language("en-US"), "en,zh-TW;q=0.6");
+        assert_eq!(accept_language("ja-JP"), "ja-JP,en;q=0.8");
+    }
+
+    #[test]
+    fn preserves_existing_original_name() {
+        let mut place = GooglePlace {
+            title: Some("Source title".to_string()),
+            notes: None,
+            url: None,
+            tags: None,
+            comments: None,
+            latitude: None,
+            longitude: None,
+            place_name: None,
+            rating: None,
+            website: None,
+            description: None,
+            original_name: Some("Existing original".to_string()),
+            english_name: None,
+            place_id: None,
+            google_place_details: None,
+        };
+
+        apply_places_api_details(
+            &mut place,
+            PlaceApiDetails {
+                id: None,
+                display_name: Some("Localized name".to_string()),
+                latitude: None,
+                longitude: None,
+                rating: None,
+                website: None,
+                google_maps_url: None,
+                description: None,
+                google_place_details: None,
+            },
+        );
+
+        assert_eq!(place.original_name.as_deref(), Some("Existing original"));
+        assert_eq!(place.place_name.as_deref(), Some("Localized name"));
     }
 
     #[test]
