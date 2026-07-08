@@ -923,7 +923,8 @@ fn is_description(s: &str, name: &str) -> bool {
     let trimmed = s.trim();
     trimmed.chars().count() >= 12
         && trimmed != name
-        && !trimmed.is_ascii()
+        && !is_english_name(trimmed, name)
+        && !is_website(trimmed)
         && !trimmed.starts_with("http://")
         && !trimmed.starts_with("https://")
         && !trimmed.starts_with("ChIJ")
@@ -948,7 +949,12 @@ fn is_english_name(s: &str, name: &str) -> bool {
     !trimmed.is_empty()
         && trimmed != name
         && trimmed.is_ascii()
+        && trimmed.chars().count() <= 80
+        && trimmed.split_whitespace().count() <= 8
         && trimmed.chars().any(|c| c.is_ascii_alphabetic())
+        && !trimmed
+            .chars()
+            .any(|c| matches!(c, '.' | '!' | '?' | '。' | '！' | '？'))
         && !trimmed.starts_with("http://")
         && !trimmed.starts_with("https://")
         && !trimmed.starts_with("ChIJ")
@@ -1165,6 +1171,52 @@ mod tests {
         );
         assert_eq!(place.latitude, Some(24.1477358));
         assert_eq!(place.longitude, Some(120.6736482));
+    }
+
+    #[test]
+    fn parse_getlist_places_preserves_english_description_as_description() {
+        let response = serde_json::json!([[
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            [[
+                null,
+                [
+                    null,
+                    null,
+                    "Sanitized address",
+                    null,
+                    null,
+                    [null, null, 35.6586, 139.7454],
+                    null,
+                    "ChIJSANITIZED"
+                ],
+                "東京タワー",
+                null,
+                "Tokyo Tower",
+                4.6,
+                "https://example.com/tokyo-tower",
+                "A landmark observation tower in Tokyo."
+            ]]
+        ]]);
+
+        let places = parse_getlist_places(&response, "Favorites").unwrap();
+
+        assert_eq!(places.len(), 1);
+        let place = &places[0];
+        assert_eq!(place.title.as_deref(), Some("東京タワー"));
+        assert_eq!(place.original_name.as_deref(), Some("東京タワー"));
+        assert_eq!(place.place_name.as_deref(), Some("東京タワー"));
+        assert_eq!(place.english_name.as_deref(), Some("Tokyo Tower"));
+        assert_eq!(
+            place.description.as_deref(),
+            Some("A landmark observation tower in Tokyo.")
+        );
     }
 
     #[test]
