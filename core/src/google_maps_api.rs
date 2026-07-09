@@ -42,6 +42,9 @@ pub struct GooglePlaceDetails {
 
 pub struct GoogleMapsClient {
     client: reqwest::Client,
+    // Google saved-list import currently relies on browser cookies because the
+    // internal Maps endpoints expose data not available through the OAuth flow
+    // used elsewhere in the app.
     cookies: HashMap<String, String>,
 }
 
@@ -64,6 +67,9 @@ impl GoogleMapsClient {
 
     fn request_headers(&self) -> reqwest::header::HeaderMap {
         let mut headers = reqwest::header::HeaderMap::new();
+        // These headers mirror browser requests to Google Maps preview
+        // endpoints. Small changes can affect whether Google returns JSON,
+        // redirects, or an auth challenge.
         headers.insert("X-Same-Domain", "1".parse().unwrap());
         headers.insert(
             reqwest::header::COOKIE,
@@ -99,6 +105,8 @@ impl GoogleMapsClient {
             .duration_since(std::time::UNIX_EPOCH)
             .ok()?
             .as_secs();
+        // Google expects SAPISIDHASH to include the current Unix timestamp and
+        // SAPISID cookie. This is not a stable public API contract.
         let input = format!("{} {}", timestamp, sapisid);
         let hash = hex_encode(&md5(input.as_bytes()));
         Some(format!("SAPISIDHASH {}_{}", timestamp, hash))
@@ -126,6 +134,8 @@ impl GoogleMapsClient {
                 status, preview
             )));
         }
+        // Google prefixes JSON responses with an XSSI guard. Strip it before
+        // handing the body to serde_json.
         let body = strip_xssi_bytes(&data).ok_or_else(|| {
             crate::error::AppError::Parse("MAS response is not valid UTF-8".into())
         })?;
@@ -172,6 +182,9 @@ impl GoogleMapsClient {
             .sapisid_value()
             .map(compute_mas_token)
             .unwrap_or_else(|| "A".into());
+        // `pb` is Google's protobuf-like text query parameter. The field order
+        // and constants were copied from working browser traffic; keep parsing
+        // tests close to this code when changing it.
         let pb = format!(
             "!1m4!1s{id}!2e1!3m1!1e1!2e2!3e2!4i500!6m3!1s{token}!7e81!28e2!18i3!16b1",
             id = list_id,
@@ -286,6 +299,8 @@ impl GoogleMapsClient {
                     all_places.extend(places);
                 }
                 Err(e) => {
+                    // Continue importing other lists. One stale or unsupported
+                    // list should not prevent the user from exporting the rest.
                     eprintln!("    Failed: {}", e);
                 }
             }
@@ -481,7 +496,9 @@ fn build_mas_pb(sapisid: &str) -> String {
     // Field 17: empty viewport (matches working curl format)
     w.write_message(17, "0", 0);
 
-    // Field 18: map viewport / zoom (same format as working curl)
+    // Field 18: map viewport / zoom. These Taiwan-centered values are not used
+    // as output coordinates; they just reproduce a browser request shape that
+    // returns the saved-list payload.
     let mut f18 = ProtoTextWriter::new();
     let mut center = ProtoTextWriter::new();
     center.write_double(1, 34667.92215241253);
@@ -511,6 +528,9 @@ fn build_mas_pb(sapisid: &str) -> String {
 // ── Response parsing ──
 
 pub fn strip_xssi(data: &str) -> Option<&str> {
+    // Google commonly prefixes JSON with `)]}'` to prevent cross-site script
+    // inclusion. Both string and byte variants exist because response decoding
+    // happens at different layers.
     let bytes = data.as_bytes();
     let start = if bytes.len() > 5 && &bytes[..5] == b")]}'\n" {
         5
@@ -561,6 +581,8 @@ fn parse_mas_lists(
                 Some(a) if a.len() >= 5 => a,
                 _ => continue,
             };
+            // Observed My Maps entries use:
+            //   arr[0] = map title, arr[1] = map id, arr[4] = map URL.
             let name = arr[0].as_str().unwrap_or("").to_string();
             let mid = arr[1].as_str().unwrap_or("").to_string();
             if name.is_empty() || mid.is_empty() {
@@ -591,6 +613,9 @@ fn parse_mas_lists(
                 Some(id) => id.to_string(),
                 None => continue,
             };
+            // Observed saved-list entries use:
+            //   arr[0][0] = list post id, arr[4] = list name, arr[12] = count,
+            //   arr[2][2] = optional public URL.
             let name = arr[4].as_str().unwrap_or("").to_string();
             if name.is_empty() {
                 continue;
@@ -623,6 +648,8 @@ fn find_saved_lists_array(root: &[serde_json::Value]) -> Option<&[serde_json::Va
             Some(a) => a,
             None => continue,
         };
+        // MAS moves sections between top-level indexes. Match the sentinel
+        // shape instead of hard-coding a root index.
         // Pattern: [null, null, null, [list_entries, ...], ...]
         if arr.len() < 4 {
             continue;
@@ -672,6 +699,8 @@ fn find_my_maps_array(root: &[serde_json::Value]) -> Option<&[serde_json::Value]
         if arr.is_empty() {
             continue;
         }
+        // Reference captures put My Maps at root[7], but matching by row shape
+        // is safer because Google can insert sections ahead of it.
         if arr.iter().all(|e| e.is_array())
             && let Some(first) = arr.first().and_then(|v| v.as_array())
             && first.len() >= 5
@@ -697,6 +726,9 @@ fn parse_getlist_places(
         Some(r) => r,
         None => return Ok(places),
     };
+    // In the current getlist payload, root[8] contains the saved place entries.
+    // Treat absence as an empty list rather than an error because Google also
+    // returns this shape for some empty or inaccessible lists.
     let entries = match root.get(8).and_then(|v| v.as_array()) {
         Some(e) => e,
         None => return Ok(places),
@@ -711,6 +743,10 @@ fn parse_getlist_places(
         if name.is_empty() {
             continue;
         }
+        // Known positions from observed Maps responses:
+        // arr[1] = place_info, arr[2] = display name, arr[3] = user note.
+        // place_info[2] or [4] = address, place_info[5][2..=3] = lat/lng,
+        // place_info[7] = place_id.
         let place_info = arr.get(1).and_then(|v| v.as_array());
         let address = place_info
             .and_then(|pi| {
@@ -784,6 +820,8 @@ fn parse_place_details(
 
     match entry {
         Some(entry_arr) => {
+            // The preview/place entry uses the same inner place_info layout as
+            // getlist: entry_arr[1] = place_info and entry_arr[2] = name.
             let place_info = entry_arr.get(1).and_then(|v| v.as_array());
             let coords = place_info.and_then(|pi| pi.get(5).and_then(|v| v.as_array()));
             let latitude = coords.and_then(|c| c.get(2).and_then(|v| v.as_f64()));
@@ -801,6 +839,8 @@ fn parse_place_details(
             let description = extract_entry_description(entry_arr, name_for_filter);
             let english_name = extract_entry_english_name(entry_arr, name_for_filter);
 
+            // Accept any confirmed detail field, not just coordinates, because
+            // some saved places expose metadata while hiding precise location.
             if latitude.is_some()
                 || longitude.is_some()
                 || place_name.is_some()
@@ -989,6 +1029,8 @@ fn find_number(value: &serde_json::Value, predicate: &impl Fn(f64) -> bool) -> O
 // ── MD5 (no external dependency) ──
 
 fn md5(input: &[u8]) -> [u8; 16] {
+    // Local MD5 avoids adding a crypto dependency for the limited Google token
+    // compatibility use case above. Do not reuse this for security features.
     Md5Context::digest(input)
 }
 

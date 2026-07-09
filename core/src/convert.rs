@@ -12,6 +12,8 @@ impl Converter {
                 let lat = place.latitude.as_ref().and_then(|s| s.parse::<f64>().ok());
                 let lon = place.longitude.as_ref().and_then(|s| s.parse::<f64>().ok());
 
+                // GeoJSON point geometry needs both numbers. Drop incomplete
+                // rows here so upload code only sees valid map features.
                 if lat.is_none() && lon.is_none() {
                     return None;
                 }
@@ -24,6 +26,8 @@ impl Converter {
 
                 let mut properties = Map::new();
 
+                // Preserve both normalized English keys and localized Takeout
+                // labels so downstream tools can use either convention.
                 if let Some(title) = &place.title {
                     properties.insert(
                         "title".to_string(),
@@ -176,6 +180,8 @@ impl Converter {
 
                 let mut properties = Map::new();
 
+                // uMap displays `name` as the marker label. Prefer the user's
+                // saved-list title, then fall back to the Google place name.
                 let name = place
                     .place_name
                     .as_deref()
@@ -211,6 +217,9 @@ impl Converter {
                 insert_string_property(&mut properties, "原文名稱", &place.original_name);
                 insert_google_place_properties(&mut properties, &place.google_place_details);
 
+                // uMap renders `description` in the marker popup, so collect
+                // the user-facing details there while still keeping individual
+                // fields below for table/filter use.
                 let mut desc_lines = Vec::new();
 
                 if let Some(name) = place.place_name.as_ref().or(place.title.as_ref())
