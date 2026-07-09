@@ -181,6 +181,9 @@ pub fn extract_place_id_from_url(url: &str) -> Option<String> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GooglePlace {
+    // This is the shared bookmark shape used by Takeout import, live Google
+    // import, conversion, and upload. Fields stay optional because each source
+    // exposes a different subset of place metadata.
     pub title: Option<String>,
     pub notes: Option<String>,
     pub url: Option<String>,
@@ -204,6 +207,8 @@ impl GooglePlace {
         field: CsvField,
         locale: ImportLocale,
     ) -> Option<usize> {
+        // Takeout localizes CSV headers. Try canonical aliases first, then
+        // localized aliases when auto-detection or Traditional Chinese is used.
         find_header_by_aliases(headers, field.canonical_headers())
             .or_else(|| find_header_by_english_hint(headers, field.canonical_headers()))
             .or_else(|| {
@@ -242,6 +247,8 @@ impl GooglePlace {
             google_place_details: None,
         };
 
+        // Normalize once so field extraction can tolerate casing, whitespace,
+        // and localized Takeout headers without duplicating lookup logic.
         let normalized_headers = headers
             .iter()
             .enumerate()
@@ -294,6 +301,9 @@ impl GooglePlace {
     }
 
     pub fn from_geojson_feature(feature: &serde_json::Value) -> Self {
+        // Takeout GeoJSON stores bookmark metadata under title-cased property
+        // names. Keep this parser strict so malformed files fail later during
+        // coordinate conversion instead of inventing partial fields here.
         let empty_map = serde_json::Map::new();
         let properties = feature
             .get("properties")
@@ -508,6 +518,9 @@ pub fn parse_takeout(path: &str) -> Result<Vec<GooglePlace>> {
 
             for result in reader.records() {
                 let record = result?;
+                // Takeout CSVs can contain spacer rows after manual edits.
+                // Skipping them keeps row numbers stable without creating empty
+                // features that conversion would drop later.
                 if record.iter().all(|f| f.is_empty()) {
                     continue;
                 }

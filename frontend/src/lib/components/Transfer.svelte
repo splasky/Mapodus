@@ -14,6 +14,7 @@
     transferring = true;
     error = '';
     try {
+      // Selection is stored by the previous wizard step so transfer can reload it here.
       const bookmarks = await apiGet<{ bookmarks: any[]; selected_ids: number[] }>('/bookmarks');
       const selectedIds = bookmarks.selected_ids.length > 0
         ? bookmarks.selected_ids

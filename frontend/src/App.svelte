@@ -6,6 +6,8 @@
   import Settings from './lib/components/Settings.svelte';
   import Transfer from './lib/components/Transfer.svelte';
 
+  // The app is intentionally a small wizard. Each step writes the server-side
+  // session state needed by the next step instead of keeping all data in Svelte.
   let step = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer' | 'settings'>('upload');
   let previousStep = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer'>('upload');
   let umapConnected = $state(false);
