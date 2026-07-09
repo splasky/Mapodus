@@ -12,6 +12,9 @@
 
   function parseCookies(s: string): Record<string, string> {
     const cookies: Record<string, string> = {};
+    // DevTools and copied cURL commands both provide semicolon-separated
+    // key=value cookies. Preserve values after the first '=' because cookie
+    // payloads can contain '=' characters.
     for (const pair of s.split(';')) {
       const eq = pair.indexOf('=');
       if (eq === -1) continue;
@@ -29,6 +32,8 @@
       const cookies = parseCookies(cookieString);
       const data = await apiPost<any>('/google/import', { cookies });
       lists = data.lists;
+      // Default to importing every list, then let the user opt out before the
+      // server converts the selected lists into bookmark records.
       selectedLists = new Set(data.lists.map((l: any) => l.name));
       imported = true;
     } catch (e) {

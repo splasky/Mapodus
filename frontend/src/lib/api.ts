@@ -13,6 +13,8 @@ export async function apiPost<T>(path: string, body?: any): Promise<T> {
   const opts: RequestInit = {
     method: 'POST',
   };
+  // Upload uses FormData while the rest of the app posts JSON payloads.
+  // Centralizing this keeps individual components from duplicating fetch setup.
   if (body instanceof FormData) {
     opts.body = body;
   } else if (body !== undefined) {

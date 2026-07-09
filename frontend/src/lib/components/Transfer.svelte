@@ -14,6 +14,8 @@
     transferring = true;
     error = '';
     try {
+      // Selection happens in the previous wizard step. Fail early here so the
+      // backend only receives an explicit list of bookmark indexes to upload.
       if (!selectedIds.length) {
         throw new Error('No bookmarks selected for transfer');
       }

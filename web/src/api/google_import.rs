@@ -23,6 +23,8 @@ pub struct DebugResponse {
 }
 
 pub async fn debug_import(Json(req): Json<DebugRequest>) -> Result<impl IntoResponse, ApiError> {
+    // This route is for parser inspection only. Responses may contain private
+    // account data, so do not save its raw output as fixtures.
     let client = GoogleMapsClient::new(req.cookies);
 
     let lists = client
@@ -88,6 +90,8 @@ pub async fn import(
         .await
         .map_err(|e| ApiError::Internal(format!("Google API error: {}", e)))?;
 
+    // The frontend lets the user choose lists by name. Keep the raw places in
+    // session for the confirm step, and return grouped copies for display.
     let mut list_map: HashMap<String, Vec<GoogleSavedPlace>> = HashMap::new();
     for place in &all_places {
         list_map
@@ -125,6 +129,8 @@ pub async fn confirm(
         .take()
         .ok_or_else(|| ApiError::BadRequest("No Google places in session. Import first.".into()))?;
 
+    // Import is a two-step flow: `/google/import` fetches everything into the
+    // session, then `/google/confirm` narrows it to the selected lists.
     let selected: Vec<GoogleSavedPlace> = google_places
         .into_iter()
         .filter(|p| req.selected_lists.contains(&p.list))
@@ -134,6 +140,8 @@ pub async fn confirm(
         return Err(ApiError::BadRequest("No places selected".into()));
     }
 
+    // Convert live Google API places into the same shape as Takeout bookmarks
+    // so downstream selection, conversion, and upload code stays source-agnostic.
     let bookmarks: Vec<GooglePlace> = selected
         .iter()
         .map(|p| {
