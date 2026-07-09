@@ -45,8 +45,12 @@ pub async fn update(
 ) -> Result<impl IntoResponse, ApiError> {
     let mut app = AppSession::from_session(&session).await;
     let desktop_mode = is_desktop_mode();
+    let current_settings = load_settings();
     let settings = AppSettings {
-        umap_default_url: normalize_umap_url(&req.umap_default_url),
+        umap_default_url: normalize_umap_url(
+            &req.umap_default_url,
+            &current_settings.umap_default_url,
+        ),
         umap_account: normalize_optional(req.umap_account),
         locale: normalize_locale(&req.locale),
         dev_mode: req.dev_mode,
@@ -132,10 +136,10 @@ fn update_secret(
     Ok(())
 }
 
-fn normalize_umap_url(value: &str) -> String {
+fn normalize_umap_url(value: &str, default_url: &str) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        "https://umap.openstreetmap.fr/en/".to_string()
+        default_url.to_string()
     } else {
         trimmed.to_string()
     }
@@ -154,4 +158,16 @@ fn normalize_optional(value: Option<String>) -> Option<String> {
     value
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn blank_umap_url_uses_existing_config_default() {
+        let default_url = "https://umap.example/en/";
+
+        assert_eq!(normalize_umap_url("   ", default_url), default_url);
+    }
 }
