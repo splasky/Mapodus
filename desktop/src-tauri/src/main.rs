@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
-const APP_CONFIG_DIR: &str = "gmap-to-umap";
+const APP_CONFIG_DIR: &str = "mapodus";
 const CONFIG_FILE: &str = "config.toml";
 const DEFAULT_UMAP_URL: &str = "https://umap.openstreetmap.fr/en/";
 
@@ -40,7 +40,7 @@ fn main() {
             let url = url::Url::parse(&format!("http://{addr}/"))?;
 
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
-                .title("Gmap to uMap")
+                .title("Mapodus")
                 .inner_size(1200.0, 820.0)
                 .min_inner_size(900.0, 640.0)
                 .build()?;
