@@ -112,101 +112,168 @@
 
 <style>
   .steps {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.65rem;
+    margin-bottom: 1.35rem;
   }
 
   .hero {
     position: relative;
+    padding: clamp(1.25rem, 4vw, 2.75rem) clamp(1rem, 4vw, 2.25rem);
+    overflow: hidden;
+    border: 1px solid rgba(36, 79, 60, 0.14);
+    border-radius: 1.8rem;
+    background:
+      linear-gradient(135deg, rgba(255, 250, 240, 0.92), rgba(238, 246, 237, 0.78)),
+      radial-gradient(circle at 92% 12%, rgba(217, 116, 43, 0.18), transparent 16rem);
+    box-shadow:
+      0 24px 70px rgba(36, 79, 60, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  }
+
+  .hero::after {
+    position: absolute;
+    right: -2.5rem;
+    bottom: -4.8rem;
+    width: 14rem;
+    height: 14rem;
+    content: '';
+    border: 1px solid rgba(36, 79, 60, 0.16);
+    border-radius: 40% 60% 54% 46%;
+    background: rgba(76, 127, 99, 0.11);
+    transform: rotate(-16deg);
   }
 
   .settings-button {
     position: absolute;
-    top: 0;
-    right: 0;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1;
     width: auto;
-    border: 1px solid #cbd5e1;
+    min-height: 2.75rem;
+    border: 1px solid rgba(36, 79, 60, 0.16);
     border-radius: 999px;
-    background: white;
-    color: #334155;
+    background: rgba(255, 252, 244, 0.86);
+    box-shadow: 0 10px 28px rgba(36, 79, 60, 0.12);
+    color: #244f3c;
     cursor: pointer;
     font-size: 1.1rem;
-    padding: 0.4rem 0.6rem;
+    padding: 0.45rem 0.72rem;
   }
 
   .settings-button:hover {
-    border-color: #2563eb;
-    color: #2563eb;
+    border-color: rgba(217, 116, 43, 0.42);
+    color: #9f4e1a;
   }
+
   .step {
     display: flex;
+    min-height: 3.2rem;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.8rem;
-    border-radius: 2rem;
-    background: #e2e8f0;
-    color: #64748b;
+    gap: 0.55rem;
+    padding: 0.62rem 0.82rem;
+    border: 1px solid rgba(36, 79, 60, 0.12);
+    border-radius: 1rem;
+    background: rgba(255, 252, 244, 0.62);
+    color: #6b746d;
     font-size: 0.85rem;
+    font-weight: 700;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
   }
+
   .step.active {
-    background: #2563eb;
-    color: white;
+    border-color: rgba(217, 116, 43, 0.34);
+    background: #fff8e8;
+    color: #9f4e1a;
+    box-shadow: 0 12px 28px rgba(217, 116, 43, 0.12);
   }
+
   .step.done {
-    background: #dcfce7;
-    color: #166534;
+    border-color: rgba(55, 109, 82, 0.24);
+    background: #edf8ef;
+    color: #244f3c;
   }
+
   .step-num {
     display: inline-flex;
-    width: 1.3rem;
-    height: 1.3rem;
+    width: 1.55rem;
+    height: 1.55rem;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: rgba(0,0,0,0.1);
+    background: rgba(36, 79, 60, 0.11);
     font-size: 0.75rem;
-    font-weight: bold;
+    font-weight: 800;
+  }
+
+  .step.active .step-num {
+    background: #d9742b;
+    color: #fffaf0;
+  }
+
+  .step.done .step-num {
+    background: #376d52;
+    color: #fffaf0;
   }
 
   :global(.nav-row) {
     display: flex;
     justify-content: space-between;
     margin-top: 1.5rem;
-    gap: 0.5rem;
+    gap: 0.75rem;
   }
+
   :global(.nav-prev), :global(.nav-next) {
-    padding: 0.5rem 1rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 0.4rem;
-    background: white;
+    padding: 0.65rem 1rem;
+    border: 1px solid rgba(36, 79, 60, 0.16);
+    border-radius: 999px;
+    background: rgba(255, 252, 244, 0.82);
+    box-shadow: 0 8px 18px rgba(36, 79, 60, 0.08);
     cursor: pointer;
-    font-size: 0.85rem;
-    color: #475569;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #244f3c;
     transition: all 0.15s;
   }
+
   :global(.nav-prev:hover), :global(.nav-next:hover) {
-    border-color: #2563eb;
-    color: #2563eb;
+    border-color: rgba(217, 116, 43, 0.38);
+    color: #9f4e1a;
   }
+
   :global(button.primary) {
     width: 100%;
-    padding: 0.7rem;
+    justify-content: center;
+    padding: 0.82rem 1rem;
     border: none;
-    border-radius: 0.5rem;
-    background: #2563eb;
-    color: white;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #244f3c, #376d52);
+    color: #fffaf0;
     cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
-    transition: background 0.2s;
+    font-size: 0.95rem;
+    font-weight: 800;
+    transition: all 0.2s;
   }
+
   :global(button.primary:hover) {
-    background: #1d4ed8;
+    background: linear-gradient(135deg, #1f4635, #326449);
   }
+
   :global(button.primary:disabled) {
-    opacity: 0.5;
+    opacity: 0.58;
     cursor: not-allowed;
+    transform: none;
+  }
+
+  @media (max-width: 720px) {
+    .steps {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .hero {
+      border-radius: 1.25rem;
+    }
   }
 </style>
