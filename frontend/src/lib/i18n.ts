@@ -53,10 +53,15 @@ export type MessageKey =
   | 'upload.continue'
   | 'upload.or'
   | 'upload.googleImport'
+  | 'upload.sourceHint'
   | 'googleImport.title'
   | 'googleImport.description'
   | 'googleImport.cookieHint'
   | 'googleImport.cookieLabel'
+  | 'googleImport.cookieStepDevTools'
+  | 'googleImport.cookieStepCopy'
+  | 'googleImport.cookieStepPaste'
+  | 'googleImport.cookieRequiredHint'
   | 'googleImport.fetching'
   | 'googleImport.fetch'
   | 'googleImport.selectTitle'
@@ -70,6 +75,7 @@ export type MessageKey =
   | 'googleImport.perList'
   | 'googleImport.saving'
   | 'googleImport.confirm'
+  | 'googleImport.selectRequiredHint'
   | 'bookmarks.title'
   | 'bookmarks.description'
   | 'bookmarks.loading'
@@ -154,10 +160,15 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'upload.continue': 'Continue to bookmarks',
     'upload.or': 'or',
     'upload.googleImport': 'Import directly from Google Maps',
+    'upload.sourceHint': 'Continue becomes available after one import source has produced bookmarks.',
     'googleImport.title': 'Import from Google Maps',
     'googleImport.description': 'Paste your Google cookies below. Cookies expire after a few hours, so collect fresh ones before each import.',
     'googleImport.cookieHint': 'Open DevTools (F12) -> Application -> Cookies -> https://www.google.com. Right-click any cookie -> Copy All, or copy the -b argument from a cURL command. Paste the raw cookie string here.',
     'googleImport.cookieLabel': 'Cookie string (semicolon-separated key=value pairs)',
+    'googleImport.cookieStepDevTools': 'Open Google Maps in your browser, then open DevTools -> Application -> Cookies -> https://www.google.com.',
+    'googleImport.cookieStepCopy': 'Copy the Google cookie string. You can use Copy All from the cookie table or copy the -b value from a cURL request.',
+    'googleImport.cookieStepPaste': 'Paste the raw semicolon-separated key=value string below. Do not edit or remove cookie names.',
+    'googleImport.cookieRequiredHint': 'Paste cookies to enable saved-list import.',
     'googleImport.fetching': 'Fetching lists...',
     'googleImport.fetch': 'Fetch my saved lists',
     'googleImport.selectTitle': 'Select lists to import',
@@ -171,6 +182,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'googleImport.perList': 'One map per list',
     'googleImport.saving': 'Saving...',
     'googleImport.confirm': 'Import selected to uMap',
+    'googleImport.selectRequiredHint': 'Select at least one list to continue.',
     'bookmarks.title': 'Select Bookmarks',
     'bookmarks.description': 'Choose which places to transfer to uMap.',
     'bookmarks.loading': 'Loading bookmarks...',
@@ -254,10 +266,15 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'upload.continue': '繼續選擇書籤',
     'upload.or': '或',
     'upload.googleImport': '直接從 Google Maps 匯入',
+    'upload.sourceHint': '當任一匯入來源產生書籤後，才能繼續下一步。',
     'googleImport.title': '從 Google Maps 匯入',
     'googleImport.description': '在下方貼上 Google Cookie。Cookie 幾小時後會過期，每次匯入前請重新取得。',
     'googleImport.cookieHint': '開啟 DevTools (F12) -> Application -> Cookies -> https://www.google.com。右鍵點擊任一 Cookie -> Copy All，或從 cURL 命令複製 -b 參數，並將原始 Cookie 字串貼在這裡。',
     'googleImport.cookieLabel': 'Cookie 字串（以分號分隔的 key=value 配對）',
+    'googleImport.cookieStepDevTools': '在瀏覽器開啟 Google Maps，然後開啟 DevTools -> Application -> Cookies -> https://www.google.com。',
+    'googleImport.cookieStepCopy': '複製 Google Cookie 字串。可以從 Cookie 表格使用 Copy All，或從 cURL request 複製 -b 的值。',
+    'googleImport.cookieStepPaste': '將原始的分號分隔 key=value 字串貼到下方。不要編輯或移除 Cookie 名稱。',
+    'googleImport.cookieRequiredHint': '貼上 Cookie 後才能匯入儲存清單。',
     'googleImport.fetching': '正在取得清單...',
     'googleImport.fetch': '取得我的儲存清單',
     'googleImport.selectTitle': '選擇要匯入的清單',
@@ -271,6 +288,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'googleImport.perList': '每個清單一張地圖',
     'googleImport.saving': '儲存中...',
     'googleImport.confirm': '匯入選取清單到 uMap',
+    'googleImport.selectRequiredHint': '至少選擇一個清單才能繼續。',
     'bookmarks.title': '選擇書籤',
     'bookmarks.description': '選擇要轉移到 uMap 的地點。',
     'bookmarks.loading': '正在載入書籤...',

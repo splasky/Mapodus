@@ -73,6 +73,11 @@
     <h2>{t('googleImport.title')}</h2>
     <p>{t('googleImport.description')}</p>
     <p class="hint">{t('googleImport.cookieHint')}</p>
+    <ol class="cookie-steps">
+      <li>{t('googleImport.cookieStepDevTools')}</li>
+      <li>{t('googleImport.cookieStepCopy')}</li>
+      <li>{t('googleImport.cookieStepPaste')}</li>
+    </ol>
 
     {#if error}
       <div class="notice error">{error}</div>
@@ -87,7 +92,7 @@
       {importing ? t('googleImport.fetching') : t('googleImport.fetch')}
     </button>
     {#if !cookieString.trim()}
-      <p class="hint action-hint">Paste cookies to enable saved-list import.</p>
+      <p class="hint action-hint">{t('googleImport.cookieRequiredHint')}</p>
     {/if}
   {:else}
     <h2>{t('googleImport.selectTitle')}</h2>
@@ -97,10 +102,10 @@
       <div class="notice error">{error}</div>
     {/if}
 
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+    <div class="list-toolbar">
       <button onclick={() => selectedLists = new Set(lists.map(l => l.name))}>{t('googleImport.selectAll')}</button>
       <button onclick={() => selectedLists = new Set()}>{t('googleImport.selectNone')}</button>
-      <span style="margin-left: auto; color: #64748b;">
+      <span class="selected-count">
         {t('googleImport.selectedCount', { selected: selectedLists.size, total: lists.length })}
       </span>
     </div>
@@ -121,21 +126,23 @@
 
     <div class="mode-select">
       <p class="label-text">{t('googleImport.transferMode')}</p>
-      <label>
-        <input type="radio" bind:group={transferMode} value="single" disabled={importing} />
-        {t('googleImport.singleMap')}
-      </label>
-      <label>
-        <input type="radio" bind:group={transferMode} value="per_list" disabled={importing} />
-        {t('googleImport.perList')}
-      </label>
+      <div class="mode-options">
+        <label>
+          <input type="radio" bind:group={transferMode} value="single" disabled={importing} />
+          <span>{t('googleImport.singleMap')}</span>
+        </label>
+        <label>
+          <input type="radio" bind:group={transferMode} value="per_list" disabled={importing} />
+          <span>{t('googleImport.perList')}</span>
+        </label>
+      </div>
     </div>
 
     <button onclick={handleConfirm} disabled={importing || selectedLists.size === 0}>
       {importing ? t('googleImport.saving') : t('googleImport.confirm')}
     </button>
     {#if selectedLists.size === 0}
-      <p class="hint action-hint">Select at least one list to continue.</p>
+      <p class="hint action-hint">{t('googleImport.selectRequiredHint')}</p>
     {/if}
   {/if}
 
@@ -161,13 +168,33 @@
     font-size: 0.8rem;
     box-sizing: border-box;
   }
+  .cookie-steps {
+    margin: 0 0 1rem 1.2rem;
+    padding: 0;
+    color: #475569;
+    font-size: 0.86rem;
+    line-height: 1.5;
+  }
+  .cookie-steps li {
+    margin-bottom: 0.35rem;
+  }
+  .list-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .selected-count {
+    margin-left: auto;
+    color: #64748b;
+  }
   .list-group {
     border: 1px solid #e2e8f0;
     border-radius: 0.5rem;
     margin-bottom: 1rem;
   }
   .list-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(2rem, 2fr) minmax(0, 5fr) minmax(4rem, 3fr);
     align-items: center;
     gap: 0.5rem;
     padding: 0.6rem 0.8rem;
@@ -176,6 +203,10 @@
   .list-row:last-child {
     border-bottom: none;
   }
+  .list-row input,
+  .mode-select input {
+    width: auto;
+  }
   .list-name {
     flex: 1;
     font-weight: 500;
@@ -183,6 +214,7 @@
   .list-count {
     color: #64748b;
     font-size: 0.85rem;
+    text-align: right;
   }
   .hint {
     font-size: 0.85rem;
@@ -204,11 +236,17 @@
     display: block;
     margin-bottom: 0.5rem;
   }
+  .mode-options {
+    display: grid;
+    gap: 0.5rem;
+  }
   .mode-select label {
-    display: inline-flex;
+    display: grid;
+    grid-template-columns: minmax(2rem, 2fr) minmax(0, 3fr);
     align-items: center;
+    justify-items: start;
     gap: 0.4rem;
-    margin-right: 1.2rem;
+    max-width: 24rem;
     font-weight: 400;
     cursor: pointer;
   }
