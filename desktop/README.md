@@ -21,9 +21,9 @@ starts the desktop app. The backend binds to a random local port on
 
 Non-sensitive desktop settings are stored in the OS config directory:
 
-- Linux: `~/.config/gmap-to-umap/config.toml`
-- macOS: `~/Library/Application Support/gmap-to-umap/config.toml`
-- Windows: `%APPDATA%\gmap-to-umap\config.toml`
+- Linux: `~/.config/mapodus/config.toml`
+- macOS: `~/Library/Application Support/mapodus/config.toml`
+- Windows: `%APPDATA%\mapodus\config.toml`
 
 Example:
 

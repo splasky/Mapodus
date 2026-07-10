@@ -1,9 +1,9 @@
-# Google Maps to uMap
+# Mapodus
 
 > [!WARNING]
 > This project is still under development. The code may change frequently. Not recommended for production use.
 
-Import your Google Maps saved places into [uMap](https://umap.openstreetmap.fr/) — as a web app or CLI tool.
+Finally, a Google Maps Saved Lists to uMap migration workflow that preserves lists, metadata, and recoverable coordinates.
 
 ## Features
 
@@ -51,7 +51,7 @@ Open **http://localhost:8900** in your browser.
 ## CLI
 
 ```
-google-maps-to-umap [OPTIONS]
+mapodus [OPTIONS]
 ```
 
 | Flag | Description |
@@ -68,10 +68,10 @@ google-maps-to-umap [OPTIONS]
 
 ```bash
 # Convert CSV to GeoJSON locally
-google-maps-to-umap --takeout ./Saved.csv --output ./places.geojson
+mapodus --takeout ./Saved.csv --output ./places.geojson
 
 # Convert and upload to uMap
-google-maps-to-umap --takeout ./Saved.csv --umap-map-id 123456 --umap-cookie "sessionid=xxx; csrftoken=xxx"
+mapodus --takeout ./Saved.csv --umap-map-id 123456 --umap-cookie "sessionid=xxx; csrftoken=xxx"
 ```
 
 ## Authentication
@@ -113,9 +113,9 @@ cargo tauri dev
 
 Desktop non-sensitive settings are stored in the OS app config directory:
 
-- Linux: `~/.config/gmap-to-umap/config.toml`
-- macOS: `~/Library/Application Support/gmap-to-umap/config.toml`
-- Windows: `%APPDATA%\gmap-to-umap\config.toml`
+- Linux: `~/.config/mapodus/config.toml`
+- macOS: `~/Library/Application Support/mapodus/config.toml`
+- Windows: `%APPDATA%\mapodus\config.toml`
 
 Secrets such as Google cookies, uMap passwords, OAuth tokens, and session
 cookies must not be stored in this config file.

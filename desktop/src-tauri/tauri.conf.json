@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Gmap to uMap",
+  "productName": "Mapodus",
   "version": "0.1.0",
-  "identifier": "com.splasky.gmap-to-umap",
+  "identifier": "com.splasky.mapodus",
   "build": {
     "beforeDevCommand": "cd ../frontend && npm install && npm run build",
     "beforeBuildCommand": "cd ../frontend && npm ci && npm run build",

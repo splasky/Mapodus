@@ -70,9 +70,9 @@ jobs:
               with:
                   projectPath: desktop/src-tauri
                   tagName: ${{ github.ref_name }}
-                  releaseName: Gmap to uMap ${{ github.ref_name }}
+                  releaseName: Mapodus ${{ github.ref_name }}
                   releaseBody: |
-                      Desktop release for Gmap to uMap.
+                      Desktop release for Mapodus.
 
                       Artifacts:
                       - macOS: dmg
@@ -86,15 +86,15 @@ jobs:
             - name: Package Linux binary archive
               if: matrix.platform == 'ubuntu-latest'
               run: |
-                  mkdir -p dist/gmap-to-umap-linux-x86_64
-                  cp target/release/gmap-to-umap-desktop dist/gmap-to-umap-linux-x86_64/
-                  cp README.md dist/gmap-to-umap-linux-x86_64/
-                  cp desktop/README.md dist/gmap-to-umap-linux-x86_64/DESKTOP.md
-                  tar -C dist -czf gmap-to-umap-linux-x86_64.tar.gz gmap-to-umap-linux-x86_64
+                  mkdir -p dist/mapodus-linux-x86_64
+                  cp target/release/mapodus-desktop dist/mapodus-linux-x86_64/
+                  cp README.md dist/mapodus-linux-x86_64/
+                  cp desktop/README.md dist/mapodus-linux-x86_64/DESKTOP.md
+                  tar -C dist -czf mapodus-linux-x86_64.tar.gz mapodus-linux-x86_64
 
             - name: Upload Linux binary archive
               if: matrix.platform == 'ubuntu-latest'
               uses: softprops/action-gh-release@v2
               with:
                   tag_name: ${{ github.ref_name }}
-                  files: gmap-to-umap-linux-x86_64.tar.gz
+                  files: mapodus-linux-x86_64.tar.gz
