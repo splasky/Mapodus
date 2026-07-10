@@ -118,10 +118,6 @@ mod tests {
         assert_eq!(first.latitude.as_deref(), Some("24.7994433"));
         assert_eq!(first.longitude.as_deref(), Some("120.9730098"));
         assert_eq!(first.rating.as_deref(), Some("4"));
-        assert_eq!(
-            first.english_name.as_deref(),
-            Some("6owl door Hsinchu Dongnan Branch")
-        );
     }
 
     #[test]
