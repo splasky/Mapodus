@@ -7,9 +7,6 @@
   let uploading = $state(false);
   let dragging = $state(false);
   let uploaded = $state<any>(null);
-  let enriching = $state(false);
-  let enrichResult = $state<string | null>(null);
-  let cookieInput = $state('');
   let desktopMode = $state(false);
 
   async function loadDesktopMode() {
@@ -38,7 +35,6 @@
     }
     uploading = true;
     error = '';
-    enrichResult = null;
     try {
       const form = new FormData();
       form.append('file', file);
@@ -49,41 +45,6 @@
     } finally {
       uploading = false;
     }
-  }
-
-  async function doEnrich() {
-    if (!cookieInput.trim()) {
-      error = t('upload.cookiesRequired');
-      return;
-    }
-    enriching = true;
-    error = '';
-    enrichResult = null;
-    try {
-      const parsed = parseCookies(cookieInput);
-      const data = await apiPost<any>('/bookmarks/enrich', { cookies: parsed });
-      enrichResult = t('upload.enrichSummary', {
-        enriched: data.enriched,
-        skipped: data.skipped,
-      });
-      uploaded = { bookmarks: data.bookmarks, selected_ids: [] };
-    } catch (e) {
-      error = String(e);
-    } finally {
-      enriching = false;
-    }
-  }
-
-  function parseCookies(raw: string): Record<string, string> {
-    const result: Record<string, string> = {};
-    for (const part of raw.split(';')) {
-      const trimmed = part.trim();
-      const eq = trimmed.indexOf('=');
-      if (eq > 0) {
-        result[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
-      }
-    }
-    return result;
   }
 
   function openFilePicker() {
@@ -177,31 +138,6 @@
       {/if}
     {/if}
 
-    <details>
-      <summary
-        style="cursor: pointer; color: #2563eb; font-weight: 500; margin-top: 1rem;"
-      >{t('upload.enrichTitle')}</summary>
-      <p class="hint">
-        {t('upload.enrichHint')}
-      </p>
-      <textarea
-        bind:value={cookieInput}
-        class="cookie-input"
-        placeholder="SAPISID=...; SID=...; HSID=..."
-        rows="3"
-      ></textarea>
-      <button
-        class="enrich-btn"
-        onclick={doEnrich}
-        disabled={enriching}
-      >
-        {enriching ? t('upload.enriching') : t('upload.enrichAction')}
-      </button>
-      {#if enrichResult}
-        <div class="notice success">{enrichResult}</div>
-      {/if}
-    </details>
-
     <div class="nav-row" style="margin-top: 1.5rem;">
       <button class="primary" onclick={onUpload}>{t('upload.continue')}</button>
     </div>
@@ -274,30 +210,6 @@
     font-size: 0.85rem;
     color: #64748b;
     margin: 0.5rem 0;
-  }
-  .cookie-input {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 0.375rem;
-    font-family: monospace;
-    font-size: 0.8rem;
-    box-sizing: border-box;
-    resize: vertical;
-  }
-  .enrich-btn {
-    margin-top: 0.5rem;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 0.375rem;
-    background: #6366f1;
-    color: white;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.85rem;
-  }
-  .enrich-btn:disabled {
-    opacity: 0.6;
   }
   .validation-ready {
     background: #ecfdf5;
