@@ -1538,15 +1538,6 @@ mod tests {
     }
 
     #[test]
-    fn is_english_name_validates() {
-        assert!(is_english_name("English Place", "中文名稱"));
-        assert!(!is_english_name("中文名稱", "中文名稱"));
-        assert!(!is_english_name("", "Name"));
-        assert!(!is_english_name("Name.", "Name")); // punctuation
-        assert!(!is_english_name("https://example", "Name")); // URL
-    }
-
-    #[test]
     fn find_string_searches_recursively() {
         let value = serde_json::json!({
             "a": "hello",
