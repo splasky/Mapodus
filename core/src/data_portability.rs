@@ -269,8 +269,8 @@ pub fn parse_saved_collections_csv(bytes: &[u8]) -> Result<Vec<GooglePlace>, App
             website: None,
             description: None,
             original_name: None,
-            english_name: None,
             place_id: None,
+            google_place_details: None,
         });
     }
 
@@ -324,8 +324,8 @@ fn google_place_from_starred_feature(feature: &JsonValue) -> Option<GooglePlace>
         website: None,
         description: address,
         original_name: None,
-        english_name: None,
         place_id: None,
+        google_place_details: None,
     })
 }
 
