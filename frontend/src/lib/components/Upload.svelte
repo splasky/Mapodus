@@ -190,7 +190,7 @@
     <button class="google-btn" onclick={onGoogleImport}>
       {t('upload.googleImport')}
     </button>
-
+    <p class="hint source-hint">Continue becomes available after one import source has produced bookmarks.</p>
   {/if}
 </div>
 
@@ -294,5 +294,8 @@
     margin-top: 0.75rem;
     font-weight: 600;
     font-size: 0.9rem;
+  }
+  .source-hint {
+    text-align: center;
   }
 </style>
