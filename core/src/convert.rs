@@ -320,7 +320,6 @@ impl Converter {
                 set_prop!("rating", place.rating);
                 set_prop!("website", place.website);
                 set_prop!("original_name", place.original_name);
-                set_prop!("english_name", place.english_name);
 
                 Some(Feature {
                     bbox: None,

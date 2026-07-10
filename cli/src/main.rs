@@ -250,8 +250,7 @@ mod tests {
         let places = google::parse_takeout(&path).unwrap();
 
         // First 3 rows have !1s URLs without @lat,lng → coords should be None
-        for i in 0..3 {
-            let p = &places[i];
+        for (i, p) in places.iter().enumerate().take(3) {
             assert!(
                 p.latitude.is_none(),
                 "Row {} should not have latitude (no @ in URL), got {:?}",
@@ -303,11 +302,6 @@ mod tests {
             assert!(
                 p.original_name.is_none(),
                 "Row {} should have no original_name (not in CSV)",
-                i
-            );
-            assert!(
-                p.english_name.is_none(),
-                "Row {} should have no english_name (not in CSV)",
                 i
             );
         }

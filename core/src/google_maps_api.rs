@@ -1311,7 +1311,6 @@ mod tests {
             details.website.is_none(),
             "website not yet parsed from API response"
         );
-        assert!(details.description.is_none(), "description not yet parsed");
         assert!(
             details.original_name.is_none(),
             "original_name not yet parsed"
@@ -1340,10 +1339,10 @@ mod tests {
         ]);
 
         let result = parse_place_details(&response, place_id).unwrap();
-        assert!(
-            result.is_none(),
-            "Should return None when no coords in entry"
-        );
+        let details = result.expect("metadata-only entries still return partial details");
+        assert!(details.latitude.is_none());
+        assert!(details.longitude.is_none());
+        assert_eq!(details.place_name.as_deref(), Some("No Coords Place"));
     }
 
     #[test]

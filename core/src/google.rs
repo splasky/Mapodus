@@ -656,7 +656,6 @@ mod tests {
         assert!(place.website.is_none());
         assert!(place.description.is_none());
         assert!(place.original_name.is_none());
-        assert!(place.english_name.is_none());
     }
 
     #[test]
@@ -671,7 +670,7 @@ mod tests {
         assert_eq!(place.latitude.as_deref(), Some("24.8583332"));
         assert_eq!(place.longitude.as_deref(), Some("120.9927297"));
         assert!(place.place_id.is_none());
-        assert!(place.title.as_deref() == Some(""));
+        assert!(place.title.is_none());
     }
 
     #[test]
@@ -705,11 +704,10 @@ mod tests {
         assert!(place.place_name.is_none());
         assert!(place.description.is_none());
         assert!(place.original_name.is_none());
-        assert!(place.english_name.is_none());
-        // Empty CSV fields → Some("")
-        assert_eq!(place.notes.as_deref(), Some(""));
-        assert_eq!(place.tags.as_deref(), Some(""));
-        assert_eq!(place.comments.as_deref(), Some(""));
+        // Empty CSV fields are normalized away.
+        assert!(place.notes.is_none());
+        assert!(place.tags.is_none());
+        assert!(place.comments.is_none());
     }
 
     #[test]

@@ -378,7 +378,6 @@ fn parse_place_details_direct(value: &serde_json::Value, place_id: &str) -> Goog
                 website: None,
                 description: None,
                 original_name: None,
-                english_name: None,
             };
         }
     };
@@ -408,7 +407,6 @@ fn parse_place_details_direct(value: &serde_json::Value, place_id: &str) -> Goog
                 website: None,
                 description: None,
                 original_name: None,
-                english_name: None,
             }
         }
         None => GooglePlaceDetails {
@@ -420,7 +418,6 @@ fn parse_place_details_direct(value: &serde_json::Value, place_id: &str) -> Goog
             website: None,
             description: None,
             original_name: None,
-            english_name: None,
         },
     }
 }
