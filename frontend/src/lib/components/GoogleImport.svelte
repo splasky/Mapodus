@@ -1,7 +1,8 @@
 <script lang="ts">
   import { apiPost } from '../api';
+  import { t } from '../i18n';
 
-  let { onImport, onPrev, onNext }: { onImport: () => void; onPrev?: () => void; onNext?: () => void } = $props();
+  let { onImport }: { onImport: () => void } = $props();
   let cookieString = $state('');
   let error = $state('');
   let importing = $state(false);
@@ -69,35 +70,35 @@
 
 <div class="card">
   {#if !imported}
-    <h2>Import from Google Maps</h2>
-    <p>Paste your Google cookies below. Cookies expire after a few hours — collect fresh ones before each import.</p>
-    <p class="hint">Open DevTools (<kbd>F12</kbd>) → Application → Cookies → <code>https://www.google.com</code>. Right-click any cookie → <strong>Copy All</strong>, or copy the <code>-b</code> argument from a cURL command. Paste the raw cookie string here.</p>
+    <h2>{t('googleImport.title')}</h2>
+    <p>{t('googleImport.description')}</p>
+    <p class="hint">{t('googleImport.cookieHint')}</p>
 
     {#if error}
       <div class="notice error">{error}</div>
     {/if}
 
     <label>
-      <span class="label-text">Cookie string (semicolon-separated <code>key=value</code> pairs)</span>
+      <span class="label-text">{t('googleImport.cookieLabel')}</span>
       <textarea bind:value={cookieString} placeholder="SAPISID=...; SID=...; HSID=...; __Secure-1PSIDTS=...; ..." disabled={importing} rows={4}></textarea>
     </label>
 
     <button onclick={handleImport} disabled={importing || !cookieString.trim()}>
-      {importing ? 'Fetching lists...' : 'Fetch My Saved Lists'}
+      {importing ? t('googleImport.fetching') : t('googleImport.fetch')}
     </button>
   {:else}
-    <h2>Select Lists to Import</h2>
-    <p>Choose which saved lists to import from Google Maps.</p>
+    <h2>{t('googleImport.selectTitle')}</h2>
+    <p>{t('googleImport.selectDescription')}</p>
 
     {#if error}
       <div class="notice error">{error}</div>
     {/if}
 
     <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-      <button onclick={() => selectedLists = new Set(lists.map(l => l.name))}>Select All</button>
-      <button onclick={() => selectedLists = new Set()}>Select None</button>
+      <button onclick={() => selectedLists = new Set(lists.map(l => l.name))}>{t('googleImport.selectAll')}</button>
+      <button onclick={() => selectedLists = new Set()}>{t('googleImport.selectNone')}</button>
       <span style="margin-left: auto; color: #64748b;">
-        {selectedLists.size} / {lists.length} lists selected
+        {t('googleImport.selectedCount', { selected: selectedLists.size, total: lists.length })}
       </span>
     </div>
 
@@ -110,32 +111,28 @@
             onchange={() => toggleList(list.name)}
           />
           <span class="list-name">{list.name}</span>
-          <span class="list-count">{list.count} places</span>
+          <span class="list-count">{t('googleImport.places', { count: list.count })}</span>
         </div>
       {/each}
     </div>
 
     <div class="mode-select">
-      <p class="label-text">Transfer mode:</p>
+      <p class="label-text">{t('googleImport.transferMode')}</p>
       <label>
         <input type="radio" bind:group={transferMode} value="single" disabled={importing} />
-        All in one map
+        {t('googleImport.singleMap')}
       </label>
       <label>
         <input type="radio" bind:group={transferMode} value="per_list" disabled={importing} />
-        One map per list
+        {t('googleImport.perList')}
       </label>
     </div>
 
     <button onclick={handleConfirm} disabled={importing || selectedLists.size === 0}>
-      {importing ? 'Saving...' : 'Import Selected to uMap'}
+      {importing ? t('googleImport.saving') : t('googleImport.confirm')}
     </button>
   {/if}
 
-  <div class="nav-row">
-    <button class="nav-prev" onclick={onPrev}>Previous</button>
-    <button class="nav-next" onclick={onNext}>Next</button>
-  </div>
 </div>
 
 <style>
@@ -148,10 +145,6 @@
     font-size: 0.85rem;
     font-weight: 600;
     color: #334155;
-  }
-  .label-text code {
-    font-weight: 400;
-    color: #64748b;
   }
   input {
     width: 100%;
