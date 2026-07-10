@@ -139,3 +139,35 @@ fn parse_cookies(text: &str) -> std::collections::HashMap<String, String> {
     }
     map
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_cookies_normal_format() {
+        let map = parse_cookies("SAPISID=abc123; SID=def456");
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.get("SAPISID").unwrap(), "abc123");
+        assert_eq!(map.get("SID").unwrap(), "def456");
+    }
+
+    #[test]
+    fn parse_cookies_handles_empty_string() {
+        let map = parse_cookies("");
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn parse_cookies_skips_malformed_entries() {
+        let map = parse_cookies("SAPISID=abc123; noequalsign; =value; key=; =");
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.get("SAPISID").unwrap(), "abc123");
+    }
+
+    #[test]
+    fn parse_cookies_handles_equals_in_value() {
+        let map = parse_cookies("session=abc=def; token=xyz");
+        assert_eq!(map.get("session").unwrap(), "abc=def");
+    }
+}

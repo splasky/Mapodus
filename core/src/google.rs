@@ -733,6 +733,78 @@ mod tests {
         assert_eq!(place.longitude.as_deref(), Some("121.565"));
     }
     #[test]
+    fn extracts_coords_from_url_with_at_format() {
+        let coords =
+            extract_coords_from_url("https://www.google.com/maps/place/Test/@25.1972,55.2744,15z");
+        assert_eq!(coords, Some((25.1972, 55.2744)));
+    }
+
+    #[test]
+    fn extracts_coords_from_url_with_search() {
+        let coords = extract_coords_from_url("https://www.google.com/maps/search/25.1972,55.2744");
+        assert_eq!(coords, Some((25.1972, 55.2744)));
+    }
+
+    #[test]
+    fn extracts_coords_from_url_with_q_params() {
+        let coords = extract_coords_from_url("https://maps.google.com/?q=25.1972,55.2744");
+        assert_eq!(coords, Some((25.1972, 55.2744)));
+    }
+
+    #[test]
+    fn extracts_coords_skips_place_id_in_q_param() {
+        let coords =
+            extract_coords_from_url("https://www.google.com/maps/place/?q=place_id:ChIJabc123");
+        assert_eq!(coords, None);
+    }
+
+    #[test]
+    fn extracts_coords_returns_none_for_url_without_coords() {
+        let coords = extract_coords_from_url("https://example.com");
+        assert_eq!(coords, None);
+    }
+
+    #[test]
+    fn extracts_coords_returns_none_for_empty_url() {
+        let coords = extract_coords_from_url("");
+        assert_eq!(coords, None);
+    }
+
+    #[test]
+    fn extracts_place_id_from_standard_url() {
+        let id = extract_place_id_from_url(
+            "https://www.google.com/maps/place/?q=place_id:ChIJSANITIZED",
+        );
+        assert_eq!(id.as_deref(), Some("ChIJSANITIZED"));
+    }
+
+    #[test]
+    fn extracts_place_id_returns_none_if_not_present() {
+        let id = extract_place_id_from_url("https://www.google.com/maps/place/Test/@25.1,55.2");
+        assert_eq!(id, None);
+    }
+
+    #[test]
+    fn looks_like_google_maps_url_matches_variants() {
+        assert!(looks_like_google_maps_url(
+            "https://www.google.com/maps/place/Test"
+        ));
+        assert!(looks_like_google_maps_url("https://maps.google.com/maps"));
+        assert!(looks_like_google_maps_url("https://goo.gl/maps/abc"));
+        assert!(looks_like_google_maps_url("https://maps.app.goo.gl/abc"));
+        assert!(!looks_like_google_maps_url("https://example.com"));
+        assert!(!looks_like_google_maps_url(""));
+    }
+
+    #[test]
+    fn normalize_header_removes_punctuation_and_whitespace() {
+        assert_eq!(normalize_header("  Title  "), "title");
+        assert_eq!(normalize_header("Place Name"), "placename");
+        assert_eq!(normalize_header("星級評分(Rating)"), "星級評分rating");
+        assert_eq!(normalize_header(""), "");
+    }
+
+    #[test]
     fn parses_unknown_locale_takeout_headers_by_default_position() {
         let headers = csv::StringRecord::from(vec![
             "العنوان",

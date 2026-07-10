@@ -350,3 +350,74 @@ impl UmapClient {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn layer_id_to_string_converts_string() {
+        let v = serde_json::json!("layer-123");
+        assert_eq!(layer_id_to_string(Some(&v)), Some("layer-123".to_string()));
+    }
+
+    #[test]
+    fn layer_id_to_string_converts_integer() {
+        let v = serde_json::json!(42);
+        assert_eq!(layer_id_to_string(Some(&v)), Some("42".to_string()));
+    }
+
+    #[test]
+    fn layer_id_to_string_converts_float() {
+        #[allow(clippy::approx_constant)]
+        let v = serde_json::json!(3.14);
+        assert_eq!(layer_id_to_string(Some(&v)), Some("3.14".to_string()));
+    }
+
+    #[test]
+    fn layer_id_to_string_returns_none_for_null() {
+        assert_eq!(layer_id_to_string(None), None);
+    }
+
+    #[test]
+    fn layer_id_to_string_returns_none_for_object() {
+        let v = serde_json::json!({"id": 1});
+        assert_eq!(layer_id_to_string(Some(&v)), None);
+    }
+
+    #[test]
+    fn compute_center_finds_first_point() {
+        let fc: geojson::FeatureCollection = serde_json::from_value(serde_json::json!({
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [120.5, 24.1]}},
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [121.0, 25.0]}}
+            ]
+        }))
+        .unwrap();
+        let center = UmapClient::compute_center(&fc);
+        assert_eq!(center, Some((120.5, 24.1)));
+    }
+
+    #[test]
+    fn compute_center_returns_none_for_no_features() {
+        let fc: geojson::FeatureCollection = serde_json::from_value(serde_json::json!({
+            "type": "FeatureCollection",
+            "features": []
+        }))
+        .unwrap();
+        assert_eq!(UmapClient::compute_center(&fc), None);
+    }
+
+    #[test]
+    fn compute_center_skips_non_point_geometries() {
+        let fc: geojson::FeatureCollection = serde_json::from_value(serde_json::json!({
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[120.5, 24.1], [121.0, 25.0]]}}
+            ]
+        }))
+        .unwrap();
+        assert_eq!(UmapClient::compute_center(&fc), None);
+    }
+}

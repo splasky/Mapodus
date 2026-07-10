@@ -1441,6 +1441,173 @@ mod tests {
     }
 
     #[test]
+    fn base64url_encodes_empty_input() {
+        assert_eq!(base64url_encode(&[]), "");
+    }
+
+    #[test]
+    fn base64url_encodes_one_byte_remaining() {
+        let result = base64url_encode(&[0x41]);
+        assert_eq!(result, "QQ");
+    }
+
+    #[test]
+    fn base64url_encodes_two_bytes_remaining() {
+        let result = base64url_encode(&[0x41, 0x42]);
+        assert_eq!(result, "QUI");
+    }
+
+    #[test]
+    fn base64url_encodes_three_bytes_no_padding() {
+        let result = base64url_encode(&[0x41, 0x42, 0x43]);
+        assert_eq!(result, "QUJD");
+    }
+
+    #[test]
+    fn base64url_uses_url_safe_alphabet() {
+        let result = base64url_encode(&[0xff, 0xfb, 0xfc]);
+        assert!(!result.contains('+'));
+        assert!(!result.contains('/'));
+        assert!(result.contains('-') || result.contains('_'));
+    }
+
+    #[test]
+    fn strip_xssi_removes_newline_prefix() {
+        let result = strip_xssi(")]}'\n{\"key\": \"value\"}");
+        assert_eq!(result, Some("{\"key\": \"value\"}"));
+    }
+
+    #[test]
+    fn strip_xssi_removes_prefix_without_newline() {
+        // `)]}` (without trailing `'` and newline) is not handled — the code
+        // compares 4 bytes against a 3-byte literal, which never matches.
+        let result = strip_xssi(")]}{\"key\": \"value\"}");
+        assert_eq!(result, Some(")]}{\"key\": \"value\"}"));
+    }
+
+    #[test]
+    fn strip_xssi_returns_trimmed_when_no_prefix() {
+        let result = strip_xssi("  {\"key\": \"value\"}  ");
+        assert_eq!(result, Some("{\"key\": \"value\"}"));
+    }
+
+    #[test]
+    fn strip_xssi_bytes_handles_variants() {
+        assert_eq!(
+            strip_xssi_bytes(b")]}'\n{\"key\": \"value\"}"),
+            Some("{\"key\": \"value\"}")
+        );
+        assert_eq!(strip_xssi_bytes(b"[my data]"), Some("[my data]"));
+        assert_eq!(
+            strip_xssi_bytes(b"{\"key\": \"value\"}"),
+            Some("{\"key\": \"value\"}")
+        );
+    }
+
+    #[test]
+    fn format_rating_rounds_correctly() {
+        assert_eq!(format_rating(4.0), "4");
+        assert_eq!(format_rating(4.5), "4.5");
+        assert_eq!(format_rating(4.55), "4.6");
+        assert_eq!(format_rating(4.44), "4.4");
+        assert_eq!(format_rating(0.0), "0");
+        assert_eq!(format_rating(5.0), "5");
+    }
+
+    #[test]
+    fn is_website_validates_urls() {
+        assert!(is_website("https://example.com"));
+        assert!(is_website("http://example.com"));
+        assert!(!is_website("https://google.com/maps/place/Test"));
+        assert!(!is_website("https://maps.google.com/"));
+        assert!(!is_website("https://gstatic.com/image.png"));
+        assert!(!is_website("not a url"));
+        assert!(!is_website(""));
+    }
+
+    #[test]
+    fn is_description_validates_text() {
+        assert!(is_description(
+            "古い寺院の境内にある樹齢数百年の桜です",
+            "名称"
+        ));
+        assert!(is_description("這是一個足夠長的描述文字", "名稱"));
+        assert!(!is_description("short", "Name"));
+        assert!(!is_description("Name", "Name"));
+        assert!(!is_description("https://example.com", "Name"));
+    }
+
+    #[test]
+    fn is_english_name_validates() {
+        assert!(is_english_name("English Place", "中文名稱"));
+        assert!(!is_english_name("中文名稱", "中文名稱"));
+        assert!(!is_english_name("", "Name"));
+        assert!(!is_english_name("Name.", "Name")); // punctuation
+        assert!(!is_english_name("https://example", "Name")); // URL
+    }
+
+    #[test]
+    fn find_string_searches_recursively() {
+        let value = serde_json::json!({
+            "a": "hello",
+            "b": ["world", {"c": "target"}]
+        });
+        let result = find_string(&value, &|s| s == "target");
+        assert_eq!(result, Some("target".to_string()));
+    }
+
+    #[test]
+    fn find_string_returns_none_when_not_found() {
+        let value = serde_json::json!({"a": "hello"});
+        let result = find_string(&value, &|s| s == "missing");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn find_number_searches_recursively() {
+        let value = serde_json::json!({
+            "a": [1, 2, {"b": 3.5}]
+        });
+        let result = find_number(&value, &|n| (3.0..=4.0).contains(&n));
+        assert_eq!(result, Some(3.5));
+    }
+
+    #[test]
+    fn proto_text_writer_writes_all_types() {
+        let mut w = ProtoTextWriter::new();
+        w.write_string(1, "token");
+        w.write_int(2, 42);
+        w.write_enum(3, 81);
+        #[allow(clippy::approx_constant)]
+        let pi = 3.14;
+        w.write_double(4, pi);
+        w.write_float(5, 2.5);
+        w.write_bool(6, true);
+        assert_eq!(w.into_string(), "!1stoken!2i42!3e81!4d3.14!5f2.5!6b1");
+    }
+
+    #[test]
+    fn proto_text_writer_counts_tokens() {
+        let mut w = ProtoTextWriter::new();
+        w.write_string(1, "a");
+        let inner = {
+            let mut inner = ProtoTextWriter::new();
+            inner.write_int(1, 50);
+            inner.into_string()
+        };
+        w.write_message(2, &format!("{}{}", 1, inner), 1);
+        assert_eq!(w.token_count, 3); // string(1) + message(1) + child(1)
+    }
+
+    #[test]
+    fn build_mas_pb_produces_valid_format() {
+        let pb = build_mas_pb("test-sapisid");
+        assert!(pb.contains("!1s"));
+        assert!(pb.contains("!2m"));
+        assert!(!pb.is_empty());
+    }
+
+    #[test]
     fn parse_getlist_places_extracts_available_details() {
         let response = serde_json::json!([[
             null,

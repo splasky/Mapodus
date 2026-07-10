@@ -55,3 +55,83 @@ impl fmt::Display for CookieAuth {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_cookie_str_parses_normal_format() {
+        let auth = CookieAuth::from_cookie_str("sessionid=abc123; csrftoken=xyz789").unwrap();
+        assert_eq!(auth.session_id, "abc123");
+        assert_eq!(auth.csrf_token, "xyz789");
+    }
+
+    #[test]
+    fn from_cookie_str_handles_extra_whitespace() {
+        let auth = CookieAuth::from_cookie_str("  sessionid=abc123 ;  csrftoken=xyz789  ").unwrap();
+        assert_eq!(auth.session_id, "abc123");
+        assert_eq!(auth.csrf_token, "xyz789");
+    }
+
+    #[test]
+    fn from_cookie_str_ignores_extra_cookies() {
+        let auth = CookieAuth::from_cookie_str(
+            "sessionid=abc123; extra=ignored; csrftoken=xyz789; other=stuff",
+        )
+        .unwrap();
+        assert_eq!(auth.session_id, "abc123");
+        assert_eq!(auth.csrf_token, "xyz789");
+    }
+
+    #[test]
+    fn from_cookie_str_fails_without_session_id() {
+        let result = CookieAuth::from_cookie_str("csrftoken=xyz789");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn from_cookie_str_fails_without_csrf_token() {
+        let result = CookieAuth::from_cookie_str("sessionid=abc123");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn from_cookie_str_fails_on_empty_string() {
+        let result = CookieAuth::from_cookie_str("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn to_cookie_header_formats_correctly() {
+        let auth = CookieAuth {
+            session_id: "abc123".to_string(),
+            csrf_token: "xyz789".to_string(),
+        };
+        assert_eq!(
+            auth.to_cookie_header(),
+            "sessionid=abc123; csrftoken=xyz789"
+        );
+    }
+
+    #[test]
+    fn to_csrf_header_returns_csrf_token() {
+        let auth = CookieAuth {
+            session_id: "abc123".to_string(),
+            csrf_token: "xyz789".to_string(),
+        };
+        assert_eq!(auth.to_csrf_header(), "xyz789");
+    }
+
+    #[test]
+    fn display_formats_correctly() {
+        let auth = CookieAuth {
+            session_id: "abc123".to_string(),
+            csrf_token: "xyz789".to_string(),
+        };
+        assert_eq!(
+            auth.to_string(),
+            "CookieAuth { sessionid: abc123, csrftoken: xyz789 }"
+        );
+    }
+}

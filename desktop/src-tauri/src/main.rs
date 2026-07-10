@@ -85,3 +85,62 @@ fn read_or_create_config(path: &PathBuf) -> Result<DesktopConfig, Box<dyn std::e
     let config: DesktopConfig = toml::from_str(&text)?;
     Ok(config)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    static TEST_ID: AtomicU32 = AtomicU32::new(0);
+
+    fn test_config_path() -> (std::path::PathBuf, std::path::PathBuf) {
+        let id = TEST_ID.fetch_add(1, Ordering::SeqCst);
+        let tmp = std::env::temp_dir().join(format!("gmap-test-{}-{}", std::process::id(), id));
+        (tmp.clone(), tmp.join("config.toml"))
+    }
+
+    #[test]
+    fn desktop_config_default_url() {
+        let config = DesktopConfig::default();
+        assert!(!config.umap_default_url.is_empty());
+        assert!(config.umap_default_url.starts_with("http"));
+    }
+
+    #[test]
+    fn desktop_config_path_ends_with_expected() {
+        let path = desktop_config_path().unwrap();
+        let path_str = path.to_string_lossy();
+        assert!(path_str.contains("gmap-to-umap"));
+        assert!(path_str.contains("config.toml"));
+    }
+
+    #[test]
+    fn read_or_create_config_creates_default_when_missing() {
+        let (tmp, config_path) = test_config_path();
+
+        let config = read_or_create_config(&config_path).unwrap();
+        assert!(!config.umap_default_url.is_empty());
+        assert!(config.umap_default_url.starts_with("http"));
+        assert!(config_path.exists());
+
+        let _ = std::fs::remove_file(&config_path);
+        let _ = std::fs::remove_dir(&tmp);
+    }
+
+    #[test]
+    fn read_or_create_config_reads_existing() {
+        let (tmp, config_path) = test_config_path();
+        std::fs::create_dir_all(&tmp).unwrap();
+        std::fs::write(
+            &config_path,
+            r#"umap_default_url = "http://localhost:8000/en/""#,
+        )
+        .unwrap();
+
+        let config = read_or_create_config(&config_path).unwrap();
+        assert_eq!(config.umap_default_url, "http://localhost:8000/en/");
+
+        let _ = std::fs::remove_file(&config_path);
+        let _ = std::fs::remove_dir(&tmp);
+    }
+}

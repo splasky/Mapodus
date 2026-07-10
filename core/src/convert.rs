@@ -604,4 +604,68 @@ mod tests {
         assert!(description.contains("類型: 餐廳"));
         assert!(description.contains("狀態: OPERATIONAL"));
     }
+
+    #[test]
+    fn to_geojson_returns_empty_for_empty_input() {
+        let fc = Converter::to_geojson(&[]);
+        assert!(fc.features.is_empty());
+    }
+
+    #[test]
+    fn to_geojson_filters_out_place_without_coords() {
+        let place = GooglePlace {
+            title: Some("No coords".to_string()),
+            latitude: None,
+            longitude: None,
+            ..place_with_all_detail_fields()
+        };
+        let fc = Converter::to_geojson(&[place]);
+        assert!(fc.features.is_empty());
+    }
+
+    #[test]
+    fn to_geojson_handles_invalid_latitude() {
+        let place = GooglePlace {
+            title: Some("Bad lat".to_string()),
+            latitude: Some("not-a-number".to_string()),
+            longitude: Some("120.5".to_string()),
+            ..place_with_all_detail_fields()
+        };
+        let fc = Converter::to_geojson(&[place]);
+        assert!(fc.features.is_empty());
+    }
+
+    #[test]
+    fn to_umap_geojson_returns_empty_for_empty_input() {
+        let fc = Converter::to_umap_geojson(&[]);
+        assert!(fc.features.is_empty());
+    }
+
+    #[test]
+    fn to_umap_geojson_uses_title_fallback_when_place_name_missing() {
+        let place = GooglePlace {
+            title: Some("Fallback Title".to_string()),
+            place_name: None,
+            latitude: Some("24.1".to_string()),
+            longitude: Some("120.2".to_string()),
+            ..place_with_all_detail_fields()
+        };
+        let fc = Converter::to_umap_geojson(&[place]);
+        let props = fc.features[0].properties.as_ref().unwrap();
+        assert_eq!(
+            props.get("name").and_then(|v| v.as_str()),
+            Some("Fallback Title")
+        );
+    }
+
+    #[test]
+    fn google_place_value_traverses_nested_path() {
+        let details = serde_json::json!({
+            "displayName": {"text": "Test Place", "languageCode": "en"},
+            "location": {"latitude": 24.1, "longitude": 120.2}
+        });
+        let result = google_place_value(&details, &["displayName", "text"]);
+        assert_eq!(result.and_then(|v| v.as_str()), Some("Test Place"));
+        assert_eq!(google_place_value(&details, &["nonexistent"]), None);
+    }
 }

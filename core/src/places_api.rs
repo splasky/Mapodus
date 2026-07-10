@@ -872,6 +872,198 @@ mod tests {
     use super::*;
 
     #[test]
+    fn decode_html_entities_replaces_all_entities() {
+        assert_eq!(
+            decode_html_entities("&amp; &quot; &#39; &lt; &gt;"),
+            "& \" ' < >"
+        );
+    }
+
+    #[test]
+    fn decode_html_entities_passes_through_plain_text() {
+        assert_eq!(decode_html_entities("hello world"), "hello world");
+    }
+
+    #[test]
+    fn strip_xssi_removes_prefixes() {
+        assert_eq!(strip_xssi(")]}'\nbody"), "body");
+        assert_eq!(strip_xssi(")]}'body"), "body");
+        assert_eq!(strip_xssi("body"), "body");
+    }
+
+    #[test]
+    fn json_path_traverses_nested_arrays() {
+        let value = serde_json::json!([null, [null, null, "target"]]);
+        assert_eq!(
+            json_path(&value, &[1, 2]).and_then(|v| v.as_str()),
+            Some("target")
+        );
+        assert_eq!(json_path(&value, &[1, 5]), None);
+    }
+
+    #[test]
+    fn json_path_string_returns_none_for_empty() {
+        let value = serde_json::json!([null, ""]);
+        assert_eq!(json_path_string(&value, &[1]), None);
+    }
+
+    #[test]
+    fn extract_target_url_passes_absolute_urls() {
+        assert_eq!(
+            extract_target_url("https://example.com/page"),
+            Some("https://example.com/page".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_target_url_parses_google_redirect() {
+        let result = extract_target_url("/url?q=https://example.com&sa=U");
+        assert_eq!(result, Some("https://example.com".to_string()));
+    }
+
+    #[test]
+    fn extract_places_api_place_id_finds_in_query() {
+        let id = extract_places_api_place_id(
+            "https://www.google.com/maps/place/?q=place_id:ChIJSANITIZED",
+        );
+        assert_eq!(id.as_deref(), Some("ChIJSANITIZED"));
+    }
+
+    #[test]
+    fn extract_places_api_place_id_finds_in_places_prefix() {
+        let id =
+            extract_places_api_place_id("https://places.googleapis.com/v1/places/ChIJSANITIZED");
+        assert_eq!(id.as_deref(), Some("ChIJSANITIZED"));
+    }
+
+    #[test]
+    fn extract_places_api_place_id_returns_none_for_knowledge_graph() {
+        let id = extract_places_api_place_id(
+            "https://www.google.com/maps/place/Test?place_id=%2Fg%2F11jz959qng",
+        );
+        assert_eq!(id, None);
+    }
+
+    #[test]
+    fn normalize_places_api_place_id_strips_prefixes() {
+        assert_eq!(
+            normalize_places_api_place_id("places/ChIJabc"),
+            Some("ChIJabc")
+        );
+        assert_eq!(normalize_places_api_place_id(" ChIJabc "), Some("ChIJabc"));
+        assert_eq!(normalize_places_api_place_id("/g/abc"), None);
+        assert_eq!(normalize_places_api_place_id(""), None);
+    }
+
+    #[test]
+    fn extract_place_id_from_query_handles_variants() {
+        let id =
+            extract_place_id_from_query("https://www.google.com/maps/place/?q=place_id:ChIJabc");
+        assert_eq!(id.as_deref(), Some("ChIJabc"));
+
+        let id = extract_place_id_from_query("https://www.google.com/maps/place/?place_id=ChIJabc");
+        assert_eq!(id.as_deref(), Some("ChIJabc"));
+    }
+
+    #[test]
+    fn extract_place_id_after_finds_marker() {
+        assert_eq!(
+            extract_place_id_after("!1s0x1234:0x5678", "!1s"),
+            Some("0x1234:0x5678".to_string())
+        );
+        assert_eq!(extract_place_id_after("no marker", "!1s"), None);
+    }
+
+    #[test]
+    fn extract_coordinates_from_query_with_q_param() {
+        let coords =
+            extract_coordinates_from_query("https://www.google.com/maps/place?q=25.1972,55.2744");
+        assert_eq!(coords, Some((25.1972, 55.2744)));
+    }
+
+    #[test]
+    fn extract_coordinates_from_data_params_test() {
+        let coords = extract_coordinates_from_data_params("data=!3d24.169194!4d120.646361");
+        assert_eq!(coords, Some((24.169194, 120.646361)));
+    }
+
+    #[test]
+    fn extract_number_after_works_with_marker() {
+        let num = extract_number_after("!3d24.169194", "!3d");
+        assert!((num.unwrap() - 24.169194).abs() < 1e-6);
+        assert_eq!(extract_number_after("no marker", "!3d"), None);
+    }
+
+    #[test]
+    fn parse_coordinates_handles_decimal() {
+        let coords = parse_coordinates("24.169194, 120.646361");
+        assert_eq!(coords, Some((24.169194, 120.646361)));
+    }
+
+    #[test]
+    fn parse_coordinates_handles_dms() {
+        let coords = parse_coordinates("24°10'09.1\"N 120°38'46.9\"E");
+        assert!(coords.is_some());
+        let (lat, lng) = coords.unwrap();
+        assert!((lat - 24.169194).abs() < 0.00001);
+        assert!((lng - 120.646361).abs() < 0.00001);
+    }
+
+    #[test]
+    fn parse_dms_coordinates_rejects_invalid() {
+        assert_eq!(parse_dms_coordinates("invalid"), None);
+    }
+
+    #[test]
+    fn valid_lat_lng_checks_bounds() {
+        assert!(valid_lat_lng(0.0, 0.0));
+        assert!(valid_lat_lng(90.0, 180.0));
+        assert!(valid_lat_lng(-90.0, -180.0));
+        assert!(!valid_lat_lng(91.0, 0.0));
+        assert!(!valid_lat_lng(0.0, 181.0));
+        assert!(!valid_lat_lng(f64::NAN, 0.0));
+    }
+
+    #[test]
+    fn extract_google_maps_uris_finds_google_urls() {
+        let urls = extract_google_maps_uris(
+            "visit https://www.google.com/maps/place/Test and https://maps.app.goo.gl/abc",
+        );
+        assert_eq!(urls.len(), 2);
+        assert!(urls[0].contains("google.com/maps"));
+        assert!(urls[1].contains("maps.app.goo.gl"));
+    }
+
+    #[test]
+    fn extract_google_maps_uris_returns_empty_for_no_match() {
+        let urls = extract_google_maps_uris("no urls here");
+        assert!(urls.is_empty());
+    }
+
+    #[test]
+    fn format_rating_in_places_api_rounds_correctly() {
+        assert_eq!(format_rating(4.0), "4");
+        assert_eq!(format_rating(4.5), "4.5");
+        assert_eq!(format_rating(4.55), "4.6");
+    }
+
+    #[test]
+    fn has_any_data_returns_false_for_empty() {
+        let details = PlaceApiDetails {
+            id: None,
+            display_name: None,
+            latitude: None,
+            longitude: None,
+            rating: None,
+            website: None,
+            google_maps_url: None,
+            description: None,
+            google_place_details: None,
+        };
+        assert!(!details.has_any_data());
+    }
+
+    #[test]
     fn parses_places_api_text_search_response() {
         let response: TextSearchResponse = serde_json::from_value(serde_json::json!({
             "places": [{
