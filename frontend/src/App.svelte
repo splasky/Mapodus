@@ -5,7 +5,8 @@
   import ConnectUmap from './lib/components/ConnectUmap.svelte';
   import Settings from './lib/components/Settings.svelte';
   import Transfer from './lib/components/Transfer.svelte';
-  import { t } from './lib/i18n';
+  import { apiGet } from './lib/api';
+  import { setLocale, t } from './lib/i18n';
 
   // The app is intentionally a small wizard. Each step writes the server-side
   // session state needed by the next step instead of keeping all data in Svelte.
@@ -13,6 +14,12 @@
   let previousStep = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer'>('upload');
   let umapConnected = $state(false);
   let bookmarksUploaded = $state(false);
+
+  $effect(() => {
+    apiGet<{ locale?: string }>('/settings')
+      .then(settings => setLocale(settings.locale))
+      .catch(() => setLocale(null));
+  });
 
   function onUpload() {
     bookmarksUploaded = true;

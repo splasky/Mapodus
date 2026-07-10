@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiGet, apiPost } from '../api';
+  import { t } from '../i18n';
 
   let { onConnect, onPrev, onNext }: { onConnect: () => void; onPrev?: () => void; onNext?: () => void } = $props();
   let umapUrl = $state('https://umap.openstreetmap.fr/en/');
@@ -34,8 +35,8 @@
   async function connect() {
     if (!umapUrl || !username || (!password && !passwordSaved)) {
       error = passwordSaved
-        ? 'Please fill in uMap URL and username'
-        : 'Please fill in all fields';
+        ? t('connect.missingRequired')
+        : t('connect.missingWithoutSavedPassword');
       return;
     }
     connecting = true;
@@ -52,36 +53,36 @@
 </script>
 
 <div class="card">
-  <h2>Connect to uMap</h2>
-  <p>Enter your uMap instance URL and login credentials.</p>
+  <h2>{t('connect.title')}</h2>
+  <p>{t('connect.description')}</p>
 
   {#if error}
     <div class="notice error">{error}</div>
   {/if}
 
   <label>
-    uMap URL
+    {t('connect.umapUrl')}
     <input bind:value={umapUrl} placeholder="https://umap.openstreetmap.fr/en/" />
   </label>
   <label>
-    Username
-    <input bind:value={username} placeholder="your uMap username" />
+    {t('connect.username')}
+    <input bind:value={username} placeholder={t('connect.usernamePlaceholder')} />
   </label>
   <label>
-    Password
+    {t('connect.password')}
     <input
       type="password"
       bind:value={password}
-      placeholder={passwordSaved ? 'Saved password will be used if left blank' : 'your uMap password'}
+      placeholder={passwordSaved ? t('connect.savedPasswordPlaceholder') : t('connect.passwordPlaceholder')}
     />
   </label>
 
     <button class="primary" onclick={connect} disabled={connecting}>
-    {connecting ? 'Connecting...' : 'Connect'}
+    {connecting ? t('connect.connecting') : t('connect.connect')}
   </button>
 
   <div class="nav-row">
-    <button class="nav-prev" onclick={onPrev}>Previous</button>
-    <button class="nav-next" onclick={onNext}>Next</button>
+    <button class="nav-prev" onclick={onPrev}>{t('common.previous')}</button>
+    <button class="nav-next" onclick={onNext}>{t('common.next')}</button>
   </div>
 </div>

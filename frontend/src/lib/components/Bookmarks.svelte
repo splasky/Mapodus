@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiGet, apiPost } from '../api';
+  import { t } from '../i18n';
 
   let { onSelect, onPrev, onNext }: { onSelect: () => void; onPrev?: () => void; onNext?: () => void } = $props();
   let bookmarks = $state<any[]>([]);
@@ -57,21 +58,21 @@
 </script>
 
 <div class="card">
-  <h2>Select Bookmarks</h2>
-  <p>Choose which places to transfer to uMap.</p>
+  <h2>{t('bookmarks.title')}</h2>
+  <p>{t('bookmarks.description')}</p>
 
   {#if error}
     <div class="notice error">{error}</div>
   {/if}
 
   {#if loading}
-    <p>Loading bookmarks...</p>
+    <p>{t('bookmarks.loading')}</p>
   {:else}
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-      <button onclick={selectAll}>Select All</button>
-      <button onclick={selectNone}>Select None</button>
-      <span style="margin-left: auto; color: #64748b;">
-        {selected.size} / {bookmarks.length} selected
+    <div class="bookmark-toolbar">
+      <button onclick={selectAll}>{t('bookmarks.selectAll')}</button>
+      <button onclick={selectNone}>{t('bookmarks.selectNone')}</button>
+      <span class="selected-count">
+        {t('bookmarks.selectedCount', { selected: selected.size, total: bookmarks.length })}
       </span>
     </div>
 
@@ -79,15 +80,41 @@
       {#each bookmarks as bookmark, i}
         <div class="bookmark-row">
           <input type="checkbox" checked={selected.has(i)} onchange={() => toggle(i)} />
-          <span class="bk-title">{bookmark.title || bookmark.place_name || 'Untitled'}</span>
+          <span class="bk-title">{bookmark.title || bookmark.place_name || t('bookmarks.untitled')}</span>
           {#if bookmark.latitude && bookmark.longitude}
-            <span class="bk-has-coords" title="Has coordinates">📍</span>
+            <span class="bk-has-coords" title={t('bookmarks.hasCoordinates')}>📍</span>
           {:else}
-            <span class="bk-no-coords" title="Missing coordinates">⚠️</span>
+            <span class="bk-no-coords" title={t('bookmarks.missingCoordinates')}>⚠️</span>
           {/if}
+        </div>
+      {/each}
+    </div>
+
+    <button class="primary" onclick={proceed} disabled={selected.size === 0 || transferring}>
+      {#if transferring}
+        <span class="spinner"></span> {t('bookmarks.transferring')}
+      {:else}
+        {t('bookmarks.transferAction', { count: selected.size })}
+      {/if}
+    </button>
+  {/if}
+
+  <div class="nav-row">
+    <button class="nav-prev" onclick={onPrev}>{t('common.previous')}</button>
+    <button class="nav-next" onclick={onNext}>{t('common.next')}</button>
+  </div>
 </div>
 
 <style>
+  .bookmark-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .selected-count {
+    margin-left: auto;
+    color: #64748b;
+  }
   .spinner {
     display: inline-block;
     width: 1rem;
@@ -124,27 +151,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .bk-has-coords {
-    font-size: 0.85rem;
-  }
+  .bk-has-coords,
   .bk-no-coords {
     font-size: 0.85rem;
   }
 </style>
-      {/each}
-    </div>
-
-    <button class="primary" onclick={proceed} disabled={selected.size === 0 || transferring}>
-      {#if transferring}
-        <span class="spinner"></span> Enriching & transferring...
-      {:else}
-        Transfer {selected.size} bookmarks to uMap
-      {/if}
-    </button>
-  {/if}
-
-  <div class="nav-row">
-    <button class="nav-prev" onclick={onPrev}>Previous</button>
-    <button class="nav-next" onclick={onNext}>Next</button>
-  </div>
-</div>

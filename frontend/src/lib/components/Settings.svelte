@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiGet, apiPost } from '../api';
+  import { setLocale, t } from '../i18n';
 
   let { onBack }: { onBack: () => void } = $props();
 
@@ -73,9 +74,8 @@
         clear_google_maps_api_key: clearGoogleMapsApiKey
       });
       applySettings(settings);
-      saved = desktopMode
-        ? 'Settings saved. Secrets are stored in the OS credential vault.'
-        : 'Settings saved. Secrets are session-only in web/server mode.';
+      setLocale(settings.locale);
+      saved = desktopMode ? t('settings.savedDesktop') : t('settings.savedWeb');
     } catch (e) {
       error = String(e);
     } finally {
@@ -89,11 +89,11 @@
 </script>
 
 <div class="card">
-  <h2>Settings</h2>
-  <p>Configure defaults used during migration. Passwords and API keys are never shown after saving.</p>
+  <h2>{t('settings.title')}</h2>
+  <p>{t('settings.description')}</p>
 
   {#if loading}
-    <div class="notice">Loading settings...</div>
+    <div class="notice">{t('settings.loading')}</div>
   {:else}
     {#if error}
       <div class="notice error">{error}</div>
@@ -103,47 +103,47 @@
     {/if}
 
     <label>
-      uMap URL
+      {t('settings.umapUrl')}
       <input bind:value={umapDefaultUrl} placeholder="https://umap.openstreetmap.fr/en/" />
     </label>
 
     <label>
-      uMap account
-      <input bind:value={umapAccount} placeholder="optional uMap username" />
+      {t('settings.umapAccount')}
+      <input bind:value={umapAccount} placeholder={t('settings.umapAccountPlaceholder')} />
     </label>
 
     <label>
-      uMap password
+      {t('settings.umapPassword')}
       <input
         type="password"
         bind:value={umapPassword}
-        placeholder={umapPasswordSaved ? 'Saved. Enter a new password to replace it.' : 'Optional'}
+        placeholder={umapPasswordSaved ? t('settings.secretSavedPlaceholder') : t('settings.optionalPlaceholder')}
       />
     </label>
     {#if umapPasswordSaved}
       <label class="inline">
         <input type="checkbox" bind:checked={clearUmapPassword} />
-        Remove saved uMap password
+        {t('settings.removeUmapPassword')}
       </label>
     {/if}
 
     <label>
-      Google Maps API key
+      {t('settings.googleMapsApiKey')}
       <input
         type="password"
         bind:value={googleMapsApiKey}
-        placeholder={googleMapsApiKeySaved ? 'Saved. Enter a new key to replace it.' : 'Optional'}
+        placeholder={googleMapsApiKeySaved ? t('settings.secretSavedPlaceholder') : t('settings.optionalPlaceholder')}
       />
     </label>
     {#if googleMapsApiKeySaved}
       <label class="inline">
         <input type="checkbox" bind:checked={clearGoogleMapsApiKey} />
-        Remove saved Google Maps API key
+        {t('settings.removeGoogleMapsApiKey')}
       </label>
     {/if}
 
     <label>
-      Language
+      {t('settings.language')}
       <select bind:value={locale}>
         <option value="en">English</option>
         <option value="zh-TW">繁體中文</option>
@@ -152,24 +152,24 @@
 
     <label class="inline">
       <input type="checkbox" bind:checked={devMode} />
-      Enable developer mode
+      {t('settings.devMode')}
     </label>
 
     <div class="settings-note">
       {#if desktopMode}
-        Sensitive values are stored with your OS credential vault/keychain.
+        {t('settings.desktopSecretNote')}
       {:else}
-        Web/server mode keeps sensitive values in this browser session only.
+        {t('settings.webSecretNote')}
       {/if}
     </div>
 
     <button class="primary" onclick={save} disabled={saving}>
-      {saving ? 'Saving...' : 'Save settings'}
+      {saving ? t('settings.saving') : t('settings.save')}
     </button>
   {/if}
 
   <div class="nav-row">
-    <button class="nav-prev" onclick={onBack}>Back</button>
+    <button class="nav-prev" onclick={onBack}>{t('common.back')}</button>
   </div>
 </div>
 

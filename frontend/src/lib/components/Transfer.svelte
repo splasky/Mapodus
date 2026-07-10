@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiGet, apiPost } from '../api';
+  import { t } from '../i18n';
 
   let { onDone, onPrev }: { onDone: () => void; onPrev?: () => void } = $props();
   let transferring = $state(false);
@@ -56,42 +57,42 @@
 </script>
 
 <div class="card">
-  <h2>Transfer to uMap</h2>
+  <h2>{t('transfer.title')}</h2>
 
   {#if error}
     <div class="notice error">{error}</div>
   {/if}
 
   {#if transferring}
-    <p>Creating map and uploading bookmarks...</p>
+    <p>{t('transfer.progress')}</p>
     <progress></progress>
   {:else if result}
     <div class="notice success">
       {#if result.maps}
-        <p>Created {result.maps.length} maps:</p>
+        <p>{t('transfer.createdMaps', { count: result.maps.length })}</p>
         <ul class="map-list">
           {#each result.maps as map}
             <li>
               <strong>{map.name}</strong> —
               <a href={map.map_url} target="_blank" rel="noopener noreferrer" onclick={(event) => openMap(event, map.map_url)}>
-                Open in uMap
+                {t('transfer.openInUmap')}
               </a>
             </li>
           {/each}
         </ul>
       {:else}
-        <p>Map created successfully!</p>
-        <p>Map ID: {result.map_id}</p>
+        <p>{t('transfer.success')}</p>
+        <p>{t('transfer.mapId', { id: result.map_id ?? '' })}</p>
         <p>
           <a href={result.map_url} target="_blank" rel="noopener noreferrer" onclick={(event) => openMap(event, result?.map_url)}>
-            Open map in uMap
+            {t('transfer.openInUmap')}
           </a>
         </p>
       {/if}
     </div>
-    <button onclick={onDone}>Upload another map 🗺️!</button>
+    <button onclick={onDone}>{t('transfer.uploadAnother')}</button>
   {:else}
-    <p>Starting transfer...</p>
+    <p>{t('transfer.starting')}</p>
   {/if}
 
 </div>
