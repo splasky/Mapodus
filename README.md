@@ -1,8 +1,5 @@
 # Mapodus
 
-> [!WARNING]
-> This project is still under development. The code may change frequently. Not recommended for production use.
-
 Mapodus migrates Google Maps saved places to uMap while preserving lists,
 metadata, and recoverable coordinates.
 
