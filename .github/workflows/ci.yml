@@ -46,7 +46,6 @@ jobs:
                   path: |
                       ~/.cargo/registry
                       ~/.cargo/git
-                      target
                   key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
 
             - name: Check formatting
@@ -117,7 +116,6 @@ jobs:
                   path: |
                       ~/.cargo/registry
                       ~/.cargo/git
-                      target
                   key: ${{ runner.os }}-desktop-cargo-${{ hashFiles('Cargo.lock') }}
 
             - name: Build desktop app crate
