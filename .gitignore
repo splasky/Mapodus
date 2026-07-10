@@ -59,3 +59,6 @@ desktop/src-tauri/gen/
 # opencode config
 opencode.json
 .opencode/
+
+# Build-generated static files
+web/static/index.html
