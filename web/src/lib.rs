@@ -170,4 +170,20 @@ mod tests {
         let map = parse_cookies("session=abc=def; token=xyz");
         assert_eq!(map.get("session").unwrap(), "abc=def");
     }
+
+    #[tokio::test]
+    async fn bookmarks_handler_returns_bad_request_without_session_data() {
+        let (addr, handle) = serve_on_available_port().await.unwrap();
+
+        let response = reqwest::get(format!("http://{addr}/api/bookmarks"))
+            .await
+            .unwrap();
+        let status = response.status();
+        let body: serde_json::Value = response.json().await.unwrap();
+
+        handle.abort();
+
+        assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+        assert_eq!(body["error"], "No bookmarks uploaded");
+    }
 }

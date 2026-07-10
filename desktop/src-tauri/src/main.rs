@@ -110,7 +110,7 @@ mod tests {
     fn desktop_config_path_ends_with_expected() {
         let path = desktop_config_path().unwrap();
         let path_str = path.to_string_lossy();
-        assert!(path_str.contains("gmap-to-umap"));
+        assert!(path_str.contains("mapodus"));
         assert!(path_str.contains("config.toml"));
     }
 
