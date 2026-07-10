@@ -74,9 +74,6 @@
       case 'google-import':
         if (bookmarksUploaded) step = 'bookmarks';
         break;
-      case 'bookmarks':
-        if (selectedIds.length > 0) step = 'connect';
-        break;
       case 'connect':
         if (umapConnected) step = 'transfer';
         break;
@@ -116,7 +113,7 @@
   {:else if step === 'google-import'}
     <GoogleImport onImport={onImportDone} />
   {:else if step === 'bookmarks'}
-    <Bookmarks onSelect={onSelect} onPrev={goPrev} onNext={goNext} />
+    <Bookmarks onSelect={onSelect} onPrev={goPrev} />
   {:else if step === 'connect'}
     <ConnectUmap onConnect={onConnect} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'transfer'}

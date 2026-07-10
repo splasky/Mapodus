@@ -2,7 +2,7 @@
   import { apiGet, apiPost } from '../api';
   import { t } from '../i18n';
 
-  let { onSelect, onPrev, onNext }: { onSelect: () => void; onPrev?: () => void; onNext?: () => void } = $props();
+  let { onSelect, onPrev }: { onSelect: () => void; onPrev?: () => void } = $props();
   let bookmarks = $state<any[]>([]);
   let selected = $state<Set<number>>(new Set());
   let loading = $state(true);
@@ -101,7 +101,6 @@
 
   <div class="nav-row">
     <button class="nav-prev" onclick={onPrev}>{t('common.previous')}</button>
-    <button class="nav-next" onclick={onNext}>{t('common.next')}</button>
   </div>
 </div>
 
