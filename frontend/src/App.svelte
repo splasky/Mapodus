@@ -5,6 +5,7 @@
   import ConnectUmap from './lib/components/ConnectUmap.svelte';
   import Settings from './lib/components/Settings.svelte';
   import Transfer from './lib/components/Transfer.svelte';
+  import { t } from './lib/i18n';
 
   // The app is intentionally a small wizard. Each step writes the server-side
   // session state needed by the next step instead of keeping all data in Svelte.
@@ -56,34 +57,40 @@
   }
   function goNext() {
     switch (step) {
-      case 'upload': step = 'bookmarks'; break;
-      case 'google-import': step = 'bookmarks'; break;
-      case 'bookmarks': step = 'connect'; break;
-      case 'connect': step = 'transfer'; break;
+      case 'upload':
+      case 'google-import':
+        if (bookmarksUploaded) step = 'bookmarks';
+        break;
+      case 'bookmarks':
+        if (selectedIds.length > 0) step = 'connect';
+        break;
+      case 'connect':
+        if (umapConnected) step = 'transfer';
+        break;
     }
   }
 </script>
 
 <div class="layout">
   <div class="hero">
-    <button class="settings-button" onclick={openSettings} aria-label="Open settings">⚙️</button>
-    <h1>google-maps-to-umap</h1>
-    <p>Convert Google Maps saved places to uMap</p>
+    <button class="settings-button" onclick={openSettings} aria-label={t('settings.open')}>⚙️</button>
+    <h1>{t('app.title')}</h1>
+    <p>{t('app.subtitle')}</p>
   </div>
 
   {#if step !== 'settings'}
     <div class="steps">
     <div class="step {step === 'upload' || step === 'google-import' ? 'active' : ''} {bookmarksUploaded ? 'done' : ''}">
-      <span class="step-num">1</span> Import
+      <span class="step-num">1</span> {t('steps.import')}
     </div>
     <div class="step {step === 'bookmarks' ? 'active' : ''} {bookmarksUploaded ? 'done' : ''}">
-      <span class="step-num">2</span> Select Bookmarks
+      <span class="step-num">2</span> {t('steps.selectBookmarks')}
     </div>
     <div class="step {step === 'connect' ? 'active' : ''} {umapConnected ? 'done' : ''}">
-      <span class="step-num">3</span> Connect uMap
+      <span class="step-num">3</span> {t('steps.connectUmap')}
     </div>
     <div class="step {step === 'transfer' ? 'active' : ''}">
-      <span class="step-num">4</span> Transfer
+      <span class="step-num">4</span> {t('steps.transfer')}
     </div>
   </div>
   {/if}
@@ -91,9 +98,9 @@
   {#if step === 'settings'}
     <Settings onBack={closeSettings} />
   {:else if step === 'upload'}
-    <Upload {onUpload} {onGoogleImport} onPrev={goPrev} onNext={goNext} />
+    <Upload {onUpload} {onGoogleImport} />
   {:else if step === 'google-import'}
-    <GoogleImport onImport={onImportDone} onPrev={goPrev} onNext={goNext} />
+    <GoogleImport onImport={onImportDone} />
   {:else if step === 'bookmarks'}
     <Bookmarks onSelect={onSelect} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'connect'}

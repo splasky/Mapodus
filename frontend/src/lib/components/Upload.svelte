@@ -1,7 +1,8 @@
 <script lang="ts">
   import { apiPost } from '../api';
+  import { t } from '../i18n';
 
-  let { onUpload, onGoogleImport, onPrev, onNext }: { onUpload: () => void; onGoogleImport?: () => void; onPrev?: () => void; onNext?: () => void } = $props();
+  let { onUpload, onGoogleImport }: { onUpload: () => void; onGoogleImport?: () => void } = $props();
   let error = $state('');
   let uploading = $state(false);
   let dragging = $state(false);
@@ -12,7 +13,7 @@
 
   async function handleFile(file: File) {
     if (!file.name.endsWith('.csv')) {
-      error = 'Please upload a CSV file (Google Takeout)';
+      error = t('upload.csvOnly');
       return;
     }
     uploading = true;
@@ -32,7 +33,7 @@
 
   async function doEnrich() {
     if (!cookieInput.trim()) {
-      error = 'Paste your cookies first';
+      error = t('upload.cookiesRequired');
       return;
     }
     enriching = true;
@@ -41,7 +42,10 @@
     try {
       const parsed = parseCookies(cookieInput);
       const data = await apiPost<any>('/bookmarks/enrich', { cookies: parsed });
-      enrichResult = `Enriched: ${data.enriched}, Skipped: ${data.skipped}`;
+      enrichResult = t('upload.enrichSummary', {
+        enriched: data.enriched,
+        skipped: data.skipped,
+      });
       uploaded = { bookmarks: data.bookmarks, selected_ids: [] };
     } catch (e) {
       error = String(e);
@@ -60,6 +64,10 @@
       }
     }
     return result;
+  }
+
+  function openFilePicker() {
+    document.getElementById('file-input')?.click();
   }
 
   function onDrop(e: DragEvent) {
@@ -83,11 +91,20 @@
     const file = input.files?.[0];
     if (file) handleFile(file);
   }
+
+  function onDropZoneKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openFilePicker();
+    }
+  }
 </script>
 
 <div class="card">
-  <h2>Upload Google Takeout CSV</h2>
-  <p>Download your saved places from <a href="https://takeout.google.com" target="_blank">Google Takeout</a> and upload the CSV file here.</p>
+  <h2>{t('upload.title')}</h2>
+  <p>
+    {t('upload.descriptionBeforeLink')}<a href="https://takeout.google.com" target="_blank">{t('upload.takeoutLink')}</a>{t('upload.descriptionAfterLink')}
+  </p>
 
   {#if error}
     <div class="notice error">{error}</div>
@@ -100,14 +117,15 @@
       ondragover={onDragOver}
       ondragleave={onDragLeave}
       ondrop={onDrop}
-      onclick={() => document.getElementById('file-input')?.click()}
+      onclick={openFilePicker}
+      onkeydown={onDropZoneKeydown}
       role="button"
       tabindex="0"
     >
       {#if uploading}
-        Uploading...
+        {t('upload.uploading')}
       {:else}
-        Drag & drop your CSV file here, or click to browse
+        {t('upload.dropHint')}
       {/if}
     </div>
     <input
@@ -119,7 +137,7 @@
     />
   {:else}
     <div class="upload-success">
-      ✅ Uploaded {uploaded.bookmarks.length} places
+      {t('upload.uploaded', { count: uploaded.bookmarks.length })}
     </div>
 
     {#if uploaded.validation}
@@ -141,9 +159,9 @@
     <details>
       <summary
         style="cursor: pointer; color: #2563eb; font-weight: 500; margin-top: 1rem;"
-      >Optional: Enrich with Google Maps cookies</summary>
+      >{t('upload.enrichTitle')}</summary>
       <p class="hint">
-        If your CSV is missing coordinates or addresses, paste your Google Maps cookies to attempt automatic enrichment.
+        {t('upload.enrichHint')}
       </p>
       <textarea
         bind:value={cookieInput}
@@ -156,7 +174,7 @@
         onclick={doEnrich}
         disabled={enriching}
       >
-        {enriching ? 'Enriching...' : 'Enrich with Google Maps'}
+        {enriching ? t('upload.enriching') : t('upload.enrichAction')}
       </button>
       {#if enrichResult}
         <div class="notice success">{enrichResult}</div>
@@ -164,22 +182,16 @@
     </details>
 
     <div class="nav-row" style="margin-top: 1.5rem;">
-      <button class="nav-prev" onclick={onPrev}>Previous</button>
-      <button class="primary" onclick={onUpload}>Continue to Bookmarks</button>
-      <button class="nav-next" onclick={onNext}>Next</button>
+      <button class="primary" onclick={onUpload}>{t('upload.continue')}</button>
     </div>
   {/if}
 
   {#if onGoogleImport && !uploaded}
-    <div class="divider"><span>or</span></div>
+    <div class="divider"><span>{t('upload.or')}</span></div>
     <button class="google-btn" onclick={onGoogleImport}>
-      Import directly from Google Maps
+      {t('upload.googleImport')}
     </button>
 
-    <div class="nav-row">
-      <button class="nav-prev" onclick={onPrev}>Previous</button>
-      <button class="nav-next" onclick={onNext}>Next</button>
-    </div>
   {/if}
 </div>
 
