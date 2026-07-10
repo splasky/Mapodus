@@ -86,6 +86,9 @@
     <button onclick={handleImport} disabled={importing || !cookieString.trim()}>
       {importing ? t('googleImport.fetching') : t('googleImport.fetch')}
     </button>
+    {#if !cookieString.trim()}
+      <p class="hint action-hint">Paste cookies to enable saved-list import.</p>
+    {/if}
   {:else}
     <h2>{t('googleImport.selectTitle')}</h2>
     <p>{t('googleImport.selectDescription')}</p>
@@ -131,6 +134,9 @@
     <button onclick={handleConfirm} disabled={importing || selectedLists.size === 0}>
       {importing ? t('googleImport.saving') : t('googleImport.confirm')}
     </button>
+    {#if selectedLists.size === 0}
+      <p class="hint action-hint">Select at least one list to continue.</p>
+    {/if}
   {/if}
 
 </div>
@@ -183,6 +189,9 @@
     color: #64748b;
     margin-bottom: 0.8rem;
     line-height: 1.5;
+  }
+  .action-hint {
+    text-align: center;
   }
   .mode-select {
     margin: 1rem 0;
