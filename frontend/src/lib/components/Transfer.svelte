@@ -1,14 +1,24 @@
 <script lang="ts">
-  import { apiPost } from '../api';
+  import { apiGet, apiPost } from '../api';
 
-  let { selectedIds, onDone, onPrev }: { selectedIds: number[]; onDone: () => void; onPrev?: () => void } = $props();
+  let { selectedIds, onDone }: { selectedIds: number[]; onDone: () => void } = $props();
   let transferring = $state(false);
   let error = $state('');
+  let desktopMode = $state(false);
   let result = $state<{
     map_id?: string;
     map_url?: string;
     maps?: Array<{ name: string; map_id: string; map_url: string }>;
   } | null>(null);
+
+  async function loadDesktopMode() {
+    try {
+      const settings = await apiGet<{ desktop_mode: boolean }>('/settings');
+      desktopMode = settings.desktop_mode;
+    } catch {
+      desktopMode = false;
+    }
+  }
 
   async function transfer() {
     transferring = true;
@@ -28,6 +38,19 @@
     }
   }
 
+  async function openMap(event: MouseEvent, url: string | undefined) {
+    if (!desktopMode || !url) return;
+    event.preventDefault();
+    try {
+      // Desktop mode uses the embedded backend to hand off uMap URLs to the OS
+      // browser. Web mode keeps the normal anchor behavior.
+      await apiPost('/open-external', { url });
+    } catch (e) {
+      error = String(e);
+    }
+  }
+
+  $effect(() => { loadDesktopMode(); });
   $effect(() => { transfer(); });
 </script>
 
@@ -49,7 +72,7 @@
           {#each result.maps as map}
             <li>
               <strong>{map.name}</strong> —
-              <a href={map.map_url} target="_blank" rel="noopener noreferrer">
+              <a href={map.map_url} target="_blank" rel="noopener noreferrer" onclick={(event) => openMap(event, map.map_url)}>
                 Open in uMap
               </a>
             </li>
@@ -59,21 +82,17 @@
         <p>Map created successfully!</p>
         <p>Map ID: {result.map_id}</p>
         <p>
-          <a href={result.map_url} target="_blank" rel="noopener noreferrer">
+          <a href={result.map_url} target="_blank" rel="noopener noreferrer" onclick={(event) => openMap(event, result?.map_url)}>
             Open map in uMap
           </a>
         </p>
       {/if}
     </div>
-    <button onclick={onDone}>Start Over</button>
+    <button onclick={onDone}>Upload another map 🗺️!</button>
   {:else}
     <p>Starting transfer...</p>
   {/if}
 
-  <div class="nav-row">
-    <button class="nav-prev" onclick={onPrev}>Previous</button>
-    <span></span>
-  </div>
 </div>
 
 <style>
