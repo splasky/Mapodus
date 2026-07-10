@@ -143,14 +143,13 @@
     {#if uploaded.validation}
       {#if uploaded.validation.ready === uploaded.validation.total}
         <div class="validation-ready">
-          ✅ All {uploaded.validation.total} places have coordinates and are ready for uMap
+          ✅ {t('upload.validationReady', { total: uploaded.validation.total })}
         </div>
       {:else}
         <div class="validation-warning">
-          ⚠️ {uploaded.validation.ready} of {uploaded.validation.total} places ready —
-          {uploaded.validation.missing_coords.length} missing coordinates
+          ⚠️ {t('upload.validationWarning', { ready: uploaded.validation.ready, total: uploaded.validation.total, missingCoords: uploaded.validation.missing_coords.length })}
           {#if uploaded.validation.missing_name.length > 0}
-            , {uploaded.validation.missing_name.length} missing title
+            {t('upload.validationMissingName', { count: uploaded.validation.missing_name.length })}
           {/if}
         </div>
       {/if}

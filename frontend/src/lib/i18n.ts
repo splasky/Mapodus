@@ -1,9 +1,34 @@
-type Locale = 'en' | 'zh-TW';
+import { get, writable } from 'svelte/store';
 
-type MessageKey =
+export type Locale = 'en' | 'zh-TW';
+
+export type MessageKey =
   | 'app.title'
   | 'app.subtitle'
+  | 'common.back'
+  | 'common.next'
+  | 'common.previous'
   | 'settings.open'
+  | 'settings.title'
+  | 'settings.description'
+  | 'settings.loading'
+  | 'settings.savedDesktop'
+  | 'settings.savedWeb'
+  | 'settings.umapUrl'
+  | 'settings.umapAccount'
+  | 'settings.umapAccountPlaceholder'
+  | 'settings.umapPassword'
+  | 'settings.secretSavedPlaceholder'
+  | 'settings.optionalPlaceholder'
+  | 'settings.removeUmapPassword'
+  | 'settings.googleMapsApiKey'
+  | 'settings.removeGoogleMapsApiKey'
+  | 'settings.language'
+  | 'settings.devMode'
+  | 'settings.desktopSecretNote'
+  | 'settings.webSecretNote'
+  | 'settings.saving'
+  | 'settings.save'
   | 'steps.import'
   | 'steps.selectBookmarks'
   | 'steps.connectUmap'
@@ -17,6 +42,9 @@ type MessageKey =
   | 'upload.uploading'
   | 'upload.dropHint'
   | 'upload.uploaded'
+  | 'upload.validationReady'
+  | 'upload.validationWarning'
+  | 'upload.validationMissingName'
   | 'upload.enrichSummary'
   | 'upload.enrichTitle'
   | 'upload.enrichHint'
@@ -41,13 +69,67 @@ type MessageKey =
   | 'googleImport.singleMap'
   | 'googleImport.perList'
   | 'googleImport.saving'
-  | 'googleImport.confirm';
+  | 'googleImport.confirm'
+  | 'bookmarks.title'
+  | 'bookmarks.description'
+  | 'bookmarks.loading'
+  | 'bookmarks.selectAll'
+  | 'bookmarks.selectNone'
+  | 'bookmarks.selectedCount'
+  | 'bookmarks.untitled'
+  | 'bookmarks.hasCoordinates'
+  | 'bookmarks.missingCoordinates'
+  | 'bookmarks.transferring'
+  | 'bookmarks.transferAction'
+  | 'connect.title'
+  | 'connect.description'
+  | 'connect.missingRequired'
+  | 'connect.missingWithoutSavedPassword'
+  | 'connect.umapUrl'
+  | 'connect.username'
+  | 'connect.usernamePlaceholder'
+  | 'connect.password'
+  | 'connect.savedPasswordPlaceholder'
+  | 'connect.passwordPlaceholder'
+  | 'connect.connecting'
+  | 'connect.connect'
+  | 'transfer.title'
+  | 'transfer.progress'
+  | 'transfer.createdMaps'
+  | 'transfer.openInUmap'
+  | 'transfer.success'
+  | 'transfer.mapId'
+  | 'transfer.starting'
+  | 'transfer.uploadAnother';
 
 const messages: Record<Locale, Record<MessageKey, string>> = {
   en: {
     'app.title': 'Mapodus',
     'app.subtitle': 'Migrate your saved lists into uMap',
+    'common.back': 'Back',
+    'common.next': 'Next',
+    'common.previous': 'Previous',
     'settings.open': 'Open settings',
+    'settings.title': 'Settings',
+    'settings.description': 'Configure defaults used during migration. Passwords and API keys are never shown after saving.',
+    'settings.loading': 'Loading settings...',
+    'settings.savedDesktop': 'Settings saved. Secrets are stored in the OS credential vault.',
+    'settings.savedWeb': 'Settings saved. Secrets are session-only in web/server mode.',
+    'settings.umapUrl': 'uMap URL',
+    'settings.umapAccount': 'uMap account',
+    'settings.umapAccountPlaceholder': 'optional uMap username',
+    'settings.umapPassword': 'uMap password',
+    'settings.secretSavedPlaceholder': 'Saved. Enter a new value to replace it.',
+    'settings.optionalPlaceholder': 'Optional',
+    'settings.removeUmapPassword': 'Remove saved uMap password',
+    'settings.googleMapsApiKey': 'Google Maps API key',
+    'settings.removeGoogleMapsApiKey': 'Remove saved Google Maps API key',
+    'settings.language': 'Language',
+    'settings.devMode': 'Enable developer mode',
+    'settings.desktopSecretNote': 'Sensitive values are stored with your OS credential vault/keychain.',
+    'settings.webSecretNote': 'Web/server mode keeps sensitive values in this browser session only.',
+    'settings.saving': 'Saving...',
+    'settings.save': 'Save settings',
     'steps.import': 'Import',
     'steps.selectBookmarks': 'Select bookmarks',
     'steps.connectUmap': 'Connect uMap',
@@ -61,6 +143,9 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'upload.uploading': 'Uploading...',
     'upload.dropHint': 'Drag & drop your CSV file here, or click to browse',
     'upload.uploaded': 'Uploaded {count} places',
+    'upload.validationReady': 'All {total} places have coordinates and are ready for uMap',
+    'upload.validationWarning': '{ready} of {total} places ready - {missingCoords} missing coordinates',
+    'upload.validationMissingName': ', {count} missing title',
     'upload.enrichSummary': 'Enriched: {enriched}, Skipped: {skipped}',
     'upload.enrichTitle': 'Optional: Enrich with Google Maps cookies',
     'upload.enrichHint': 'If your CSV is missing coordinates or addresses, paste your Google Maps cookies to attempt automatic enrichment.',
@@ -86,11 +171,65 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'googleImport.perList': 'One map per list',
     'googleImport.saving': 'Saving...',
     'googleImport.confirm': 'Import selected to uMap',
+    'bookmarks.title': 'Select Bookmarks',
+    'bookmarks.description': 'Choose which places to transfer to uMap.',
+    'bookmarks.loading': 'Loading bookmarks...',
+    'bookmarks.selectAll': 'Select All',
+    'bookmarks.selectNone': 'Select None',
+    'bookmarks.selectedCount': '{selected} / {total} selected',
+    'bookmarks.untitled': 'Untitled',
+    'bookmarks.hasCoordinates': 'Has coordinates',
+    'bookmarks.missingCoordinates': 'Missing coordinates',
+    'bookmarks.transferring': 'Enriching & transferring...',
+    'bookmarks.transferAction': 'Transfer {count} bookmarks to uMap',
+    'connect.title': 'Connect to uMap',
+    'connect.description': 'Enter your uMap instance URL and login credentials.',
+    'connect.missingRequired': 'Please fill in uMap URL and username',
+    'connect.missingWithoutSavedPassword': 'Please fill in all fields',
+    'connect.umapUrl': 'uMap URL',
+    'connect.username': 'Username',
+    'connect.usernamePlaceholder': 'your uMap username',
+    'connect.password': 'Password',
+    'connect.savedPasswordPlaceholder': 'Saved password will be used if left blank',
+    'connect.passwordPlaceholder': 'your uMap password',
+    'connect.connecting': 'Connecting...',
+    'connect.connect': 'Connect',
+    'transfer.title': 'Transfer to uMap',
+    'transfer.progress': 'Creating map and uploading bookmarks...',
+    'transfer.createdMaps': 'Created {count} maps:',
+    'transfer.openInUmap': 'Open in uMap',
+    'transfer.success': 'Map created successfully!',
+    'transfer.mapId': 'Map ID: {id}',
+    'transfer.starting': 'Starting transfer...',
+    'transfer.uploadAnother': 'Upload another map 🗺️!',
   },
   'zh-TW': {
     'app.title': 'Mapodus',
     'app.subtitle': '將你儲存的清單遷移到 uMap',
+    'common.back': '返回',
+    'common.next': '下一步',
+    'common.previous': '上一步',
     'settings.open': '開啟設定',
+    'settings.title': '設定',
+    'settings.description': '設定遷移時使用的預設值。密碼與 API key 儲存後不會再次顯示。',
+    'settings.loading': '正在載入設定...',
+    'settings.savedDesktop': '設定已儲存。機密資料已存入作業系統憑證庫。',
+    'settings.savedWeb': '設定已儲存。Web/server 模式只會在此瀏覽器工作階段保留機密資料。',
+    'settings.umapUrl': 'uMap URL',
+    'settings.umapAccount': 'uMap 帳號',
+    'settings.umapAccountPlaceholder': '選填的 uMap 使用者名稱',
+    'settings.umapPassword': 'uMap 密碼',
+    'settings.secretSavedPlaceholder': '已儲存。輸入新值即可取代。',
+    'settings.optionalPlaceholder': '選填',
+    'settings.removeUmapPassword': '移除已儲存的 uMap 密碼',
+    'settings.googleMapsApiKey': 'Google Maps API key',
+    'settings.removeGoogleMapsApiKey': '移除已儲存的 Google Maps API key',
+    'settings.language': '語言',
+    'settings.devMode': '啟用開發者模式',
+    'settings.desktopSecretNote': '機密資料會儲存在作業系統憑證庫/鑰匙圈。',
+    'settings.webSecretNote': 'Web/server 模式只會在此瀏覽器工作階段保留機密資料。',
+    'settings.saving': '儲存中...',
+    'settings.save': '儲存設定',
     'steps.import': '匯入',
     'steps.selectBookmarks': '選擇書籤',
     'steps.connectUmap': '連線 uMap',
@@ -104,6 +243,9 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'upload.uploading': '上傳中...',
     'upload.dropHint': '將 CSV 檔拖曳到這裡，或點擊瀏覽檔案',
     'upload.uploaded': '已上傳 {count} 個地點',
+    'upload.validationReady': '全部 {total} 個地點都有座標，可以匯入 uMap',
+    'upload.validationWarning': '{total} 個地點中有 {ready} 個可用 - {missingCoords} 個缺少座標',
+    'upload.validationMissingName': '，{count} 個缺少標題',
     'upload.enrichSummary': '已補足：{enriched}，略過：{skipped}',
     'upload.enrichTitle': '選用：使用 Google Maps Cookie 補足資料',
     'upload.enrichHint': '如果 CSV 缺少座標或地址，貼上 Google Maps Cookie 以嘗試自動補足。',
@@ -129,16 +271,60 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'googleImport.perList': '每個清單一張地圖',
     'googleImport.saving': '儲存中...',
     'googleImport.confirm': '匯入選取清單到 uMap',
+    'bookmarks.title': '選擇書籤',
+    'bookmarks.description': '選擇要轉移到 uMap 的地點。',
+    'bookmarks.loading': '正在載入書籤...',
+    'bookmarks.selectAll': '全選',
+    'bookmarks.selectNone': '全不選',
+    'bookmarks.selectedCount': '已選擇 {selected} / {total} 個',
+    'bookmarks.untitled': '未命名',
+    'bookmarks.hasCoordinates': '有座標',
+    'bookmarks.missingCoordinates': '缺少座標',
+    'bookmarks.transferring': '正在補足並轉移...',
+    'bookmarks.transferAction': '轉移 {count} 個書籤到 uMap',
+    'connect.title': '連線到 uMap',
+    'connect.description': '輸入你的 uMap 網站 URL 與登入資訊。',
+    'connect.missingRequired': '請填寫 uMap URL 與使用者名稱',
+    'connect.missingWithoutSavedPassword': '請填寫所有欄位',
+    'connect.umapUrl': 'uMap URL',
+    'connect.username': '使用者名稱',
+    'connect.usernamePlaceholder': '你的 uMap 使用者名稱',
+    'connect.password': '密碼',
+    'connect.savedPasswordPlaceholder': '留空時會使用已儲存的密碼',
+    'connect.passwordPlaceholder': '你的 uMap 密碼',
+    'connect.connecting': '連線中...',
+    'connect.connect': '連線',
+    'transfer.title': '轉移到 uMap',
+    'transfer.progress': '正在建立地圖並上傳書籤...',
+    'transfer.createdMaps': '已建立 {count} 張地圖：',
+    'transfer.openInUmap': '在 uMap 開啟',
+    'transfer.success': '地圖建立成功！',
+    'transfer.mapId': '地圖 ID：{id}',
+    'transfer.starting': '正在開始轉移...',
+    'transfer.uploadAnother': '上傳另一張地圖 🗺️!',
   },
 };
 
-const browserLocale = (): Locale => {
-  const language = globalThis.navigator?.language.toLowerCase() ?? '';
-  return language === 'zh-tw' || language.startsWith('zh-hant') ? 'zh-TW' : 'en';
-};
+export const locale = writable<Locale>(browserLocale());
+
+function browserLocale(): Locale {
+  return normalizeLocale(globalThis.navigator?.language) ?? 'en';
+}
+
+export function normalizeLocale(value: string | null | undefined): Locale | null {
+  const language = value?.trim().toLowerCase().replace('_', '-');
+  if (!language) return null;
+  if (language === 'zh-tw' || language.startsWith('zh-hant')) return 'zh-TW';
+  if (language === 'en' || language.startsWith('en-')) return 'en';
+  return null;
+}
+
+export function setLocale(value: string | null | undefined): void {
+  locale.set(normalizeLocale(value) ?? browserLocale());
+}
 
 export function t(key: MessageKey, values: Record<string, string | number> = {}): string {
-  return messages[browserLocale()][key].replace(/\{(\w+)\}/g, (_, name) =>
-    String(values[name] ?? `{${name}}`)
-  );
+  const activeLocale = get(locale);
+  const template = messages[activeLocale]?.[key] ?? messages.en[key];
+  return template.replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? `{${name}}`));
 }
