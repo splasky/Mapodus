@@ -201,8 +201,7 @@ pub async fn enrich(
             || place.place_name.is_none()
             || place.rating.is_none()
             || place.website.is_none()
-            || place.description.is_none()
-            || place.english_name.is_none();
+            || place.description.is_none();
 
         if needs_details && let Some(pid) = &place.place_id {
             match client.get_place_details(pid).await {
@@ -227,9 +226,6 @@ pub async fn enrich(
                     }
                     if place.description.is_none() {
                         place.description = details.description;
-                    }
-                    if place.english_name.is_none() {
-                        place.english_name = details.english_name;
                     }
                     changed = true;
                 }

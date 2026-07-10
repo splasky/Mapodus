@@ -164,7 +164,6 @@ pub async fn confirm(
                     .clone()
                     .or_else(|| p.title.clone())
                     .or_else(|| p.place_name.clone()),
-                english_name: p.english_name.clone(),
                 place_id: p.place_id.clone(),
                 google_place_details: None,
             }

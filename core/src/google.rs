@@ -24,7 +24,6 @@ enum CsvField {
     Website,
     Description,
     OriginalName,
-    EnglishName,
 }
 
 impl CsvField {
@@ -42,7 +41,6 @@ impl CsvField {
             CsvField::Website => &["website", "web site"],
             CsvField::Description => &["description"],
             CsvField::OriginalName => &["original name"],
-            CsvField::EnglishName => &["english name"],
         }
     }
 
@@ -60,7 +58,6 @@ impl CsvField {
             CsvField::Website => &["網站"],
             CsvField::Description => &["簡介"],
             CsvField::OriginalName => &["原文名稱"],
-            CsvField::EnglishName => &["英文名稱"],
         }
     }
 }
@@ -196,7 +193,6 @@ pub struct GooglePlace {
     pub website: Option<String>,
     pub description: Option<String>,
     pub original_name: Option<String>,
-    pub english_name: Option<String>,
     pub place_id: Option<String>,
     pub google_place_details: Option<serde_json::Value>,
 }
@@ -242,7 +238,6 @@ impl GooglePlace {
             website: None,
             description: None,
             original_name: None,
-            english_name: None,
             place_id: None,
             google_place_details: None,
         };
@@ -276,7 +271,6 @@ impl GooglePlace {
         set_field!(website, CsvField::Website);
         set_field!(description, CsvField::Description);
         set_field!(original_name, CsvField::OriginalName);
-        set_field!(english_name, CsvField::EnglishName);
 
         apply_default_takeout_position_fallback(record, &mut place);
         apply_url_heuristic_fallback(record, &mut place);
@@ -357,10 +351,6 @@ impl GooglePlace {
                 .map(|s| s.to_string()),
             original_name: properties
                 .get("Original Name")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            english_name: properties
-                .get("English Name")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
             place_id: None,
@@ -787,7 +777,6 @@ mod tests {
             "網站(Website)",
             "簡介(Description)",
             "原文名稱(Original Name)",
-            "英文名稱(English Name)",
         ]);
         let record = csv::StringRecord::from(vec![
             "スカイツリー",
@@ -799,7 +788,6 @@ mod tests {
             "https://www.tokyo-skytree.jp/",
             "展望台",
             "東京スカイツリー",
-            "Tokyo Skytree",
         ]);
 
         let place = GooglePlace::from_csv_record(&record, &headers);
@@ -818,7 +806,6 @@ mod tests {
         );
         assert_eq!(place.description.as_deref(), Some("展望台"));
         assert_eq!(place.original_name.as_deref(), Some("東京スカイツリー"));
-        assert_eq!(place.english_name.as_deref(), Some("Tokyo Skytree"));
         assert_eq!(place.place_id.as_deref(), Some("abc123"));
     }
 

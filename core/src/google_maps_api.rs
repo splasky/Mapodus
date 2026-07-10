@@ -15,7 +15,6 @@ pub struct GoogleSavedPlace {
     pub website: Option<String>,
     pub description: Option<String>,
     pub original_name: Option<String>,
-    pub english_name: Option<String>,
     pub place_id: Option<String>,
     pub list: String,
 }
@@ -38,7 +37,6 @@ pub struct GooglePlaceDetails {
     pub website: Option<String>,
     pub description: Option<String>,
     pub original_name: Option<String>,
-    pub english_name: Option<String>,
 }
 
 pub struct GoogleMapsClient {
@@ -392,9 +390,6 @@ impl GoogleSavedPlace {
         }
         if self.description.is_none() {
             self.description = details.description;
-        }
-        if self.english_name.is_none() {
-            self.english_name = details.english_name;
         }
     }
 }
@@ -853,7 +848,6 @@ fn parse_getlist_places(
             website: extract_entry_website(arr),
             description: extract_entry_description(arr, name),
             original_name: Some(name.to_string()),
-            english_name: extract_entry_english_name(arr, name),
             place_id,
             list: list_name.to_string(),
         });
@@ -907,7 +901,6 @@ fn parse_place_details(
             let rating = extract_entry_rating(entry_arr);
             let website = extract_entry_website(entry_arr);
             let description = extract_entry_description(entry_arr, name_for_filter);
-            let english_name = extract_entry_english_name(entry_arr, name_for_filter);
 
             // Accept any confirmed detail field, not just coordinates, because
             // some saved places expose metadata while hiding precise location.
@@ -917,7 +910,6 @@ fn parse_place_details(
                 || rating.is_some()
                 || website.is_some()
                 || description.is_some()
-                || english_name.is_some()
             {
                 eprintln!(
                     "[place_details] Found details for place_id '{}': coords={:?},{:?}",
@@ -932,7 +924,6 @@ fn parse_place_details(
                     website,
                     description,
                     original_name: None,
-                    english_name,
                 }))
             } else {
                 eprintln!(
@@ -1036,41 +1027,11 @@ fn is_description(s: &str, name: &str) -> bool {
     let trimmed = s.trim();
     trimmed.chars().count() >= 12
         && trimmed != name
-        && !is_english_name(trimmed, name)
         && !is_website(trimmed)
         && !trimmed.starts_with("http://")
         && !trimmed.starts_with("https://")
         && !trimmed.starts_with("ChIJ")
         && !trimmed.contains("google.com/maps")
-}
-
-fn extract_english_name(value: &serde_json::Value, name: &str) -> Option<String> {
-    find_string(value, &|s| is_english_name(s, name))
-}
-
-fn extract_entry_english_name(entry: &[serde_json::Value], name: &str) -> Option<String> {
-    entry
-        .get(4)
-        .and_then(|v| v.as_str())
-        .filter(|s| is_english_name(s, name))
-        .map(|s| s.to_string())
-        .or_else(|| extract_english_name(&serde_json::Value::Array(entry.to_vec()), name))
-}
-
-fn is_english_name(s: &str, name: &str) -> bool {
-    let trimmed = s.trim();
-    !trimmed.is_empty()
-        && trimmed != name
-        && trimmed.is_ascii()
-        && trimmed.chars().count() <= 80
-        && trimmed.split_whitespace().count() <= 8
-        && trimmed.chars().any(|c| c.is_ascii_alphabetic())
-        && !trimmed
-            .chars()
-            .any(|c| matches!(c, '.' | '!' | '?' | '。' | '！' | '？'))
-        && !trimmed.starts_with("http://")
-        && !trimmed.starts_with("https://")
-        && !trimmed.starts_with("ChIJ")
 }
 
 fn find_string(value: &serde_json::Value, predicate: &impl Fn(&str) -> bool) -> Option<String> {
@@ -1355,10 +1316,6 @@ mod tests {
             details.original_name.is_none(),
             "original_name not yet parsed"
         );
-        assert!(
-            details.english_name.is_none(),
-            "english_name not yet parsed"
-        );
     }
 
     #[test]
@@ -1530,7 +1487,6 @@ mod tests {
             place.website.as_deref(),
             Some("https://example.com/see-tea")
         );
-        assert_eq!(place.english_name.as_deref(), Some("See Tea"));
         assert_eq!(
             place.description.as_deref(),
             Some("提供茶飲與甜點的測試簡介。")
@@ -1578,7 +1534,6 @@ mod tests {
         assert_eq!(place.title.as_deref(), Some("東京タワー"));
         assert_eq!(place.original_name.as_deref(), Some("東京タワー"));
         assert_eq!(place.place_name.as_deref(), Some("東京タワー"));
-        assert_eq!(place.english_name.as_deref(), Some("Tokyo Tower"));
         assert_eq!(
             place.description.as_deref(),
             Some("A landmark observation tower in Tokyo.")
@@ -1599,7 +1554,6 @@ mod tests {
             website: None,
             description: None,
             original_name: Some("Saved title".to_string()),
-            english_name: None,
             place_id: Some("ChIJSANITIZED".to_string()),
             list: "Favorites".to_string(),
         };
@@ -1613,7 +1567,6 @@ mod tests {
             website: Some("https://example.com".to_string()),
             description: Some("測試簡介內容。".to_string()),
             original_name: None,
-            english_name: Some("Detail English".to_string()),
         });
 
         assert_eq!(place.latitude, Some(1.0));
@@ -1622,7 +1575,6 @@ mod tests {
         assert_eq!(place.rating.as_deref(), Some("4.5"));
         assert_eq!(place.website.as_deref(), Some("https://example.com"));
         assert_eq!(place.description.as_deref(), Some("測試簡介內容。"));
-        assert_eq!(place.english_name.as_deref(), Some("Detail English"));
     }
 
     #[test]
