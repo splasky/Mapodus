@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { apiPost } from '../api';
+  import { apiGet, apiPost } from '../api';
   import { t } from '../i18n';
 
   let { onUpload, onGoogleImport }: { onUpload: () => void; onGoogleImport?: () => void } = $props();
@@ -10,6 +10,26 @@
   let enriching = $state(false);
   let enrichResult = $state<string | null>(null);
   let cookieInput = $state('');
+  let desktopMode = $state(false);
+
+  async function loadDesktopMode() {
+    try {
+      const settings = await apiGet<{ desktop_mode: boolean }>('/settings');
+      desktopMode = settings.desktop_mode;
+    } catch {
+      desktopMode = false;
+    }
+  }
+
+  async function openTakeout(event: MouseEvent) {
+    if (!desktopMode) return;
+    event.preventDefault();
+    try {
+      await apiPost('/open-external', { url: 'https://takeout.google.com/' });
+    } catch (e) {
+      error = String(e);
+    }
+  }
 
   async function handleFile(file: File) {
     if (!file.name.endsWith('.csv')) {
@@ -92,6 +112,8 @@
     if (file) handleFile(file);
   }
 
+  $effect(() => { loadDesktopMode(); });
+
   function onDropZoneKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -103,7 +125,7 @@
 <div class="card">
   <h2>{t('upload.title')}</h2>
   <p>
-    {t('upload.descriptionBeforeLink')}<a href="https://takeout.google.com" target="_blank">{t('upload.takeoutLink')}</a>{t('upload.descriptionAfterLink')}
+    {t('upload.descriptionBeforeLink')}<a href="https://takeout.google.com/" target="_blank" rel="noopener noreferrer" onclick={openTakeout}>{t('upload.takeoutLink')}</a>{t('upload.descriptionAfterLink')}
   </p>
 
   {#if error}
@@ -190,7 +212,7 @@
     <button class="google-btn" onclick={onGoogleImport}>
       {t('upload.googleImport')}
     </button>
-    <p class="hint source-hint">Continue becomes available after one import source has produced bookmarks.</p>
+    <p class="hint source-hint">{t('upload.sourceHint')}</p>
   {/if}
 </div>
 
