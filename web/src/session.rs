@@ -47,6 +47,7 @@ mod tests {
         assert!(session.umap_url.is_none());
         assert!(session.google_places.is_none());
         assert!(session.transfer_mode.is_none());
+        assert!(session.google_cookies.is_none());
         assert!(session.session_google_maps_api_key.is_none());
         assert!(session.session_umap_password.is_none());
     }
@@ -60,6 +61,7 @@ mod tests {
             umap_url: Some("http://localhost:8000/".to_string()),
             google_places: None,
             transfer_mode: Some("single".to_string()),
+            google_cookies: None,
             session_google_maps_api_key: None,
             session_umap_password: None,
         };
