@@ -121,4 +121,4 @@ jobs:
                   key: ${{ runner.os }}-desktop-cargo-${{ hashFiles('Cargo.lock') }}
 
             - name: Build desktop app crate
-              run: cargo build -p gmap-to-umap-desktop
+              run: cargo build -p mapodus-desktop

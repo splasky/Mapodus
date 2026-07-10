@@ -2,10 +2,7 @@ use clap::Parser;
 use std::path::Path;
 
 #[derive(Parser)]
-#[command(
-    name = "google-maps-to-umap",
-    about = "Convert Google Maps saved places to uMap"
-)]
+#[command(name = "mapodus", about = "Convert Google Maps saved places to uMap")]
 pub struct CliArgs {
     #[arg(short = 't', long, help = "Path to Google Takeout CSV or JSON file")]
     pub takeout: Option<String>,

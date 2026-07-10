@@ -1,7 +1,7 @@
 use clap::Parser;
 
 #[derive(Parser)]
-#[command(name = "web", about = "google-maps-to-umap web server")]
+#[command(name = "web", about = "Mapodus web server")]
 struct Args {
     #[arg(
         long,

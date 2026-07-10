@@ -45,7 +45,7 @@ type MessageKey =
 
 const messages: Record<Locale, Record<MessageKey, string>> = {
   en: {
-    'app.title': 'Google map migration tool',
+    'app.title': 'Mapodus',
     'app.subtitle': 'Migrate your saved lists into uMap',
     'settings.open': 'Open settings',
     'steps.import': 'Import',
@@ -88,7 +88,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'googleImport.confirm': 'Import selected to uMap',
   },
   'zh-TW': {
-    'app.title': 'Google 地圖遷移工具',
+    'app.title': 'Mapodus',
     'app.subtitle': '將你儲存的清單遷移到 uMap',
     'settings.open': '開啟設定',
     'steps.import': '匯入',

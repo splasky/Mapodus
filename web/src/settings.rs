@@ -3,11 +3,11 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-const APP_CONFIG_DIR: &str = "gmap-to-umap";
+const APP_CONFIG_DIR: &str = "mapodus";
 const CONFIG_FILE: &str = "config.toml";
 const DEFAULT_UMAP_URL: &str = "https://umap.openstreetmap.fr/en/";
 const DEFAULT_LOCALE: &str = "en";
-const KEYCHAIN_SERVICE: &str = "com.splasky.gmap-to-umap";
+const KEYCHAIN_SERVICE: &str = "com.splasky.mapodus";
 const KEYCHAIN_UMAP_PASSWORD: &str = "umap_password";
 const KEYCHAIN_GOOGLE_MAPS_API_KEY: &str = "google_maps_api_key";
 
