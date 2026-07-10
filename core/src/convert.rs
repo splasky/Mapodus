@@ -513,7 +513,6 @@ mod tests {
             website: Some("https://example.com".to_string()),
             description: Some("API description".to_string()),
             original_name: Some("Saved title".to_string()),
-            english_name: Some("English title should not be exported".to_string()),
             place_id: Some("ChIJSANITIZED".to_string()),
             google_place_details: Some(serde_json::json!({
                 "id": "places/ChIJSANITIZED",
@@ -583,6 +582,5 @@ mod tests {
         assert!(description.contains("地址: 測試地址"));
         assert!(description.contains("類型: 餐廳"));
         assert!(description.contains("狀態: OPERATIONAL"));
-        assert!(!description.contains("English title should not be exported"));
     }
 }

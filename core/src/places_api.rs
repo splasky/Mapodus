@@ -649,7 +649,6 @@ fn coordinate_query(place: &GooglePlace) -> Option<String> {
         .title
         .as_deref()
         .or(place.place_name.as_deref())
-        .or(place.english_name.as_deref())
         .filter(|s| !s.trim().is_empty())
         .map(|s| s.trim().to_string())
 }
@@ -972,7 +971,6 @@ mod tests {
             website: None,
             description: None,
             original_name: None,
-            english_name: None,
             place_id: None,
             google_place_details: None,
         };
@@ -1023,7 +1021,6 @@ mod tests {
             website: None,
             description: None,
             original_name: None,
-            english_name: None,
             place_id: Some("ChIJSANITIZED".to_string()),
             google_place_details: None,
         };
@@ -1046,7 +1043,6 @@ mod tests {
             website: None,
             description: None,
             original_name: None,
-            english_name: None,
             place_id: Some("ChIJSANITIZED".to_string()),
             google_place_details: None,
         };
@@ -1140,7 +1136,6 @@ mod tests {
             website: None,
             description: None,
             original_name: Some("Existing original".to_string()),
-            english_name: None,
             place_id: None,
             google_place_details: None,
         };
@@ -1288,7 +1283,6 @@ mod tests {
             website: None,
             description: None,
             original_name: None,
-            english_name: None,
             place_id: None,
             google_place_details: None,
         };
