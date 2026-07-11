@@ -64,7 +64,10 @@
   {/if}
 
   {#if transferring}
-    <p>{t('transfer.progress')}</p>
+    <div class="transfer-progress" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <p>{t('transfer.progress')}</p>
+    </div>
     <progress></progress>
   {:else if result}
     <div class="notice success">
@@ -98,6 +101,27 @@
 </div>
 
 <style>
+  .transfer-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+  }
+  .transfer-progress p {
+    margin: 0;
+  }
+  .spinner {
+    width: 1.2rem;
+    height: 1.2rem;
+    flex: 0 0 auto;
+    border: 3px solid rgba(36, 79, 60, 0.18);
+    border-top-color: #376d52;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
   .map-list {
     margin: 0.5rem 0;
     padding-left: 1.2rem;

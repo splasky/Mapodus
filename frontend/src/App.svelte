@@ -68,17 +68,6 @@
       case 'transfer': step = 'connect'; break;
     }
   }
-  function goNext() {
-    switch (step) {
-      case 'upload':
-      case 'google-import':
-        if (bookmarksUploaded) step = 'bookmarks';
-        break;
-      case 'connect':
-        if (umapConnected) step = 'transfer';
-        break;
-    }
-  }
 </script>
 
 <div class="layout">
@@ -115,7 +104,7 @@
   {:else if step === 'bookmarks'}
     <Bookmarks onSelect={onSelect} onPrev={goPrev} />
   {:else if step === 'connect'}
-    <ConnectUmap onConnect={onConnect} onPrev={goPrev} onNext={goNext} />
+    <ConnectUmap onConnect={onConnect} onPrev={goPrev} />
   {:else if step === 'transfer'}
     <Transfer onDone={onDone} onPrev={goPrev} />
   {/if}
