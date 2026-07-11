@@ -12,6 +12,11 @@ export type MessageKey =
   | 'about.title'
   | 'about.subtitle'
   | 'about.versionLabel'
+  | 'about.checkUpdate'
+  | 'about.checking'
+  | 'about.updateAvailable'
+  | 'about.whatsNewLabel'
+  | 'about.viewReleases'
   | 'about.creditsLabel'
   | 'about.credits'
   | 'about.legalLabel'
@@ -130,6 +135,11 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'about.title': 'About Mapodus',
     'about.subtitle': 'Google Maps Saved Lists to uMap',
     'about.versionLabel': 'Version',
+    'about.checkUpdate': 'Check for updates',
+    'about.checking': 'Checking...',
+    'about.updateAvailable': 'Update available:',
+    'about.whatsNewLabel': "What's New",
+    'about.viewReleases': 'View releases on GitHub',
     'about.creditsLabel': 'Credits',
     'about.credits': 'HY Chang (splasky)',
     'about.legalLabel': 'License',
@@ -247,6 +257,11 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'about.title': '關於 Mapodus',
     'about.subtitle': 'Google Maps 儲存清單到 uMap',
     'about.versionLabel': '版本',
+    'about.checkUpdate': '檢查更新',
+    'about.checking': '檢查中...',
+    'about.updateAvailable': '有更新版本：',
+    'about.whatsNewLabel': '最新消息',
+    'about.viewReleases': '在 GitHub 查看發佈版本',
     'about.creditsLabel': '製作者',
     'about.credits': 'HY Chang (splasky)',
     'about.legalLabel': '授權',
