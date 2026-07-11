@@ -118,30 +118,30 @@
   .steps {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.65rem;
-    margin-bottom: 1.35rem;
+    gap: 0.55rem;
+    margin-bottom: 1rem;
   }
 
   .hero {
     position: relative;
-    padding: clamp(1.25rem, 4vw, 2.75rem) clamp(1rem, 4vw, 2.25rem);
+    padding: clamp(0.75rem, 2.2vw, 1.35rem) clamp(0.9rem, 3vw, 1.7rem);
     overflow: hidden;
     border: 1px solid rgba(36, 79, 60, 0.14);
-    border-radius: 1.8rem;
+    border-radius: 1.25rem;
     background:
       linear-gradient(135deg, rgba(255, 250, 240, 0.92), rgba(238, 246, 237, 0.78)),
-      radial-gradient(circle at 92% 12%, rgba(217, 116, 43, 0.18), transparent 16rem);
+      radial-gradient(circle at 92% 12%, rgba(217, 116, 43, 0.16), transparent 12rem);
     box-shadow:
-      0 24px 70px rgba(36, 79, 60, 0.14),
+      0 16px 42px rgba(36, 79, 60, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.76);
   }
 
   .hero::after {
     position: absolute;
-    right: -2.5rem;
-    bottom: -4.8rem;
-    width: 14rem;
-    height: 14rem;
+    right: -2rem;
+    bottom: -5.4rem;
+    width: 11rem;
+    height: 11rem;
     content: '';
     border: 1px solid rgba(36, 79, 60, 0.16);
     border-radius: 40% 60% 54% 46%;
@@ -151,8 +151,8 @@
 
   .settings-button {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
+    top: 0.65rem;
+    right: 0.65rem;
     z-index: 1;
     width: auto;
     min-height: 2.75rem;
@@ -200,10 +200,10 @@
 
   .step {
     display: flex;
-    min-height: 3.2rem;
+    min-height: 2.75rem;
     align-items: center;
     gap: 0.55rem;
-    padding: 0.62rem 0.82rem;
+    padding: 0.5rem 0.72rem;
     border: 1px solid rgba(36, 79, 60, 0.12);
     border-radius: 1rem;
     background: rgba(255, 252, 244, 0.62);
@@ -272,6 +272,12 @@
   :global(.nav-prev:hover), :global(.nav-next:hover) {
     border-color: rgba(217, 116, 43, 0.38);
     color: #9f4e1a;
+  }
+
+  :global(.nav-row button.primary) {
+    width: auto;
+    min-width: min(18rem, 62vw);
+    margin-left: auto;
   }
 
   :global(button.primary) {

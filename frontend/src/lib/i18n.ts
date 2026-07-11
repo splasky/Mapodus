@@ -73,7 +73,6 @@ export type MessageKey =
   | 'upload.continue'
   | 'upload.or'
   | 'upload.googleImport'
-  | 'upload.sourceHint'
   | 'googleImport.title'
   | 'googleImport.description'
   | 'googleImport.cookieHint'
@@ -200,7 +199,6 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'upload.continue': 'Continue to bookmarks',
     'upload.or': 'or',
     'upload.googleImport': 'Import directly from Google Maps',
-    'upload.sourceHint': 'Continue becomes available after one import source has produced bookmarks.',
     'googleImport.title': 'Import from Google Maps',
     'googleImport.description': 'Paste your Google cookies below. Cookies expire after a few hours, so collect fresh ones before each import.',
     'googleImport.cookieHint': 'Open Google Maps, then open DevTools (F12) -> Application -> Cookies -> https://www.google.com. Copy the full Cookie header or the -b value from a Google Maps network request, then paste the raw semicolon-separated string here.',
@@ -326,7 +324,6 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'upload.continue': '繼續選擇書籤',
     'upload.or': '或',
     'upload.googleImport': '直接從 Google Maps 匯入',
-    'upload.sourceHint': '當任一匯入來源產生書籤後，才能繼續下一步。',
     'googleImport.title': '從 Google Maps 匯入',
     'googleImport.description': '在下方貼上 Google Cookie。Cookie 幾小時後會過期，每次匯入前請重新取得。',
     'googleImport.cookieHint': '開啟 Google Maps，然後開啟 DevTools (F12) -> Application -> Cookies -> https://www.google.com。複製完整 Cookie header，或從 Google Maps network request 的 cURL 複製 -b 值，再將原始分號分隔字串貼在這裡。',
