@@ -2,7 +2,7 @@
   import { apiGet, apiPost } from '../api';
   import { t } from '../i18n';
 
-  let { onConnect, onPrev, onNext }: { onConnect: () => void; onPrev?: () => void; onNext?: () => void } = $props();
+  let { onConnect, onPrev }: { onConnect: () => void; onPrev?: () => void } = $props();
   let umapUrl = $state('https://umap.openstreetmap.fr/en/');
   let username = $state('');
   let password = $state('');
@@ -81,8 +81,13 @@
     {connecting ? t('connect.connecting') : t('connect.connect')}
   </button>
 
-  <div class="nav-row">
+  <div class="nav-row single-action">
     <button class="nav-prev" onclick={onPrev}>{t('common.previous')}</button>
-    <button class="nav-next" onclick={onNext}>{t('common.next')}</button>
   </div>
 </div>
+
+<style>
+  .single-action {
+    justify-content: flex-start;
+  }
+</style>
