@@ -3,6 +3,10 @@
 Mapodus migrates Google Maps saved places to uMap while preserving lists,
 metadata, and recoverable coordinates.
 
+Mapodus is unlikely to become a large commercial product by itself, but it is
+useful because it solves a concrete personal data portability problem: moving
+saved places out of Google Maps and into open, user-controlled map formats.
+
 ![Mapodus demo](assets/demo.gif)
 
 ## Features
