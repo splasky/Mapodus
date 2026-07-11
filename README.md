@@ -35,11 +35,10 @@ inside the Tauri process, so you do not need to run a separate server.
 ### Run Locally
 
 ```bash
-cd frontend
-npm install
-npm run build
-cd ../desktop/src-tauri
-cargo tauri dev
+# Build the release
+cargo tauri build
+# Run locally
+./target/release/mapodus-desktop 
 ```
 
 ### Desktop Settings
@@ -174,17 +173,23 @@ npm install
 npm run build
 cd ..
 
-# Optional settings
-# UMAP_DEFAULT_URL or UMAP_URL: default uMap instance URL
-# GOOGLE_MAPS_API_KEY: resolve missing POI coordinates
-# DEV_MODE=true: enable debug API routes
-
-# Start the backend on http://localhost:8900
-cargo run --bin web
-
 # Start the frontend dev server on http://localhost:5173
 cd frontend
 npm run dev
+
+```
+Axum server:
+```
+# Optional settings
+# create these in .env
+UMAP_DEFAULT_URL=https://umap.openstreetmap.fr/en/
+GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+DEV_MODE=true
+```
+
+Start the backend on http://localhost:8900
+```
+cargo run --bin web
 ```
 
 The frontend dev server proxies `/api` requests to `http://localhost:8900`.
@@ -196,41 +201,6 @@ The web server also accepts optional CLI flags:
 |------|-------------|
 | `--google-cookies <COOKIES>` | Google Maps cookies for dev mode; imports and prints saved lists on startup |
 
-### Desktop Releases
-
-Pushing a version tag creates a GitHub Release:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-The release workflow builds and uploads:
-
-- macOS `.dmg`
-- Windows `.msi`
-- Linux `.AppImage`
-- Linux binary archive `.tar.gz`
-- GitHub source code `.zip`
-- GitHub source code `.tar.gz`
-
-## Testing
-
-Before committing Rust changes, run:
-
-```bash
-cargo fmt
-cargo clippy --workspace --all-targets --all-features
-cargo test --workspace --all-features
-cargo build --workspace
-```
-
-When changing frontend files, run the relevant script from `frontend/package.json`:
-
-```bash
-cd frontend
-npm run build
-```
 
 ## Project Structure
 
@@ -241,7 +211,6 @@ npm run build
 ├── frontend/       # Svelte SPA
 ├── desktop/        # Tauri desktop app
 ├── assets/         # README and release media
-├── docs/           # Development and architecture documentation
 ├── examples/       # Test data
 └── umap/           # uMap submodule for local testing
 ```
