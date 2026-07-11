@@ -80,14 +80,14 @@ button:disabled {
   transform: none;
 }
 
-button:not(.primary):not(.google-btn):not(.settings-button):not(.nav-prev):not(.nav-next):not(.enrich-btn) {
+button:not(.primary):not(.google-btn):not(.settings-button):not(.nav-prev):not(.nav-next):not(.enrich-btn):not(.text-link) {
   border-color: rgba(36, 79, 60, 0.16);
   background: rgba(255, 252, 244, 0.78);
   box-shadow: 0 8px 18px rgba(36, 79, 60, 0.09);
   color: #244f3c;
 }
 
-button:not(.primary):not(.google-btn):not(.settings-button):not(.nav-prev):not(.nav-next):not(.enrich-btn):hover {
+button:not(.primary):not(.google-btn):not(.settings-button):not(.nav-prev):not(.nav-next):not(.enrich-btn):not(.text-link):hover {
   background: #fffaf0;
   border-color: rgba(217, 116, 43, 0.34);
 }

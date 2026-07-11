@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiPost } from '../api';
   import { t } from '../i18n';
 
   let { onClose }: { onClose: () => void } = $props();
@@ -9,10 +10,9 @@
   const issueUrl = 'https://github.com/splasky/Mapodus/issues';
   const creditsUrl = 'https://github.com/splasky';
 
-  let latestVersion = $state('');
+  let latestVersion = $state(version);
   let releaseNote = $state('');
   let checkingUpdate = $state(false);
-  let updateError = $state(false);
 
   // About opens as a popup, so check GitHub releases when the popup is shown.
   $effect(() => {
@@ -21,18 +21,16 @@
 
   async function checkForUpdates() {
     checkingUpdate = true;
-    updateError = false;
     try {
       const response = await fetch('https://api.github.com/repos/splasky/Mapodus/releases/latest');
       if (!response.ok) {
-        updateError = true;
         return;
       }
       const data = await response.json();
       latestVersion = data.tag_name || data.name || '';
       releaseNote = data.name || data.tag_name || '';
     } catch {
-      updateError = true;
+      // Keep the current app version visible when release checks are unavailable.
     } finally {
       checkingUpdate = false;
     }
@@ -40,6 +38,14 @@
 
   function normalizeVersion(value: string) {
     return value.trim().replace(/^v/i, '');
+  }
+
+  async function openExternal(url: string) {
+    try {
+      await apiPost('/open-external', { url });
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   }
 
   function closeFromBackdrop(event: MouseEvent) {
@@ -77,15 +83,11 @@
         <dd>
           {#if checkingUpdate}
             {t('about.checking')}
-          {:else if latestVersion}
-            {latestVersion}
-            {#if normalizeVersion(latestVersion) !== version}
+          {:else}
+            {latestVersion || version}
+            {#if latestVersion && normalizeVersion(latestVersion) !== version}
               <span class="update-note">{t('about.updateAvailable')}</span>
             {/if}
-          {:else if updateError}
-            {t('about.updateUnavailable')}
-          {:else}
-            {t('about.updateUnknown')}
           {/if}
         </dd>
       </div>
@@ -97,12 +99,12 @@
           {:else}
             {t('about.releaseNotes')}
           {/if}
-          <a href={releasesUrl} target="_blank" rel="noreferrer">{t('about.viewReleases')}</a>
+          <button class="text-link" onclick={() => openExternal(releasesUrl)}>{t('about.viewReleases')}</button>
         </dd>
       </div>
       <div>
         <dt>{t('about.creditsLabel')}</dt>
-        <dd><a href={creditsUrl} target="_blank" rel="noreferrer">{t('about.credits')}</a></dd>
+        <dd><button class="text-link first-link" onclick={() => openExternal(creditsUrl)}>{t('about.credits')}</button></dd>
       </div>
       <div>
         <dt>{t('about.legalLabel')}</dt>
@@ -111,8 +113,8 @@
       <div>
         <dt>{t('about.linksLabel')}</dt>
         <dd class="links">
-          <a href={repoUrl} target="_blank" rel="noreferrer">{t('about.website')}</a>
-          <a href={issueUrl} target="_blank" rel="noreferrer">{t('about.reportIssue')}</a>
+          <button class="text-link first-link" onclick={() => openExternal(repoUrl)}>{t('about.website')}</button>
+          <button class="text-link" onclick={() => openExternal(issueUrl)}>{t('about.reportIssue')}</button>
         </dd>
       </div>
     </dl>
@@ -206,9 +208,31 @@
     font-size: 0.9rem;
   }
 
-  dd a {
+  .text-link {
     display: inline-block;
+    min-height: auto;
     margin-left: 0.45rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #9f4e1a;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: rgba(159, 78, 26, 0.28);
+    text-decoration-thickness: 0.12em;
+    text-underline-offset: 0.18em;
+  }
+
+  .text-link:hover {
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .first-link {
+    margin-left: 0;
   }
 
   .links {
@@ -217,9 +241,6 @@
     gap: 0.75rem;
   }
 
-  .links a:first-child {
-    margin-left: 0;
-  }
 
   .update-note {
     display: inline-block;
@@ -234,7 +255,7 @@
       gap: 0.2rem;
     }
 
-    dd a {
+    .text-link {
       margin-right: 0.45rem;
       margin-left: 0;
     }
