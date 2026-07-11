@@ -84,6 +84,7 @@ jobs:
                   args: ${{ matrix.args }}
 
             - name: Report binary size
+              if: matrix.platform != 'windows-latest'
               run: |
                   echo "=== Binary size report ==="
                   ls -lh target/release/mapodus-desktop
