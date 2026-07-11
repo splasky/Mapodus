@@ -77,10 +77,6 @@ export type MessageKey =
   | 'googleImport.description'
   | 'googleImport.cookieHint'
   | 'googleImport.cookieLabel'
-  | 'googleImport.cookieStepDevTools'
-  | 'googleImport.cookieStepCopy'
-  | 'googleImport.cookieStepPaste'
-  | 'googleImport.cookieRequiredHint'
   | 'googleImport.fetching'
   | 'googleImport.fetch'
   | 'googleImport.selectTitle'
@@ -203,10 +199,6 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'googleImport.description': 'Paste your Google cookies below. Cookies expire after a few hours, so collect fresh ones before each import.',
     'googleImport.cookieHint': 'Open Google Maps, then open DevTools (F12) -> Application -> Cookies -> https://www.google.com. Copy the full Cookie header or the -b value from a Google Maps network request, then paste the raw semicolon-separated string here.',
     'googleImport.cookieLabel': 'Cookie string (semicolon-separated key=value pairs)',
-    'googleImport.cookieStepDevTools': 'Open Google Maps in your browser, then open DevTools -> Application -> Cookies -> https://www.google.com.',
-    'googleImport.cookieStepCopy': 'In the Network tab, copy a Google Maps request as cURL and copy the -b cookie value, or copy the full Cookie header from the request headers.',
-    'googleImport.cookieStepPaste': 'Paste the raw semicolon-separated key=value string below. Do not edit or remove cookie names.',
-    'googleImport.cookieRequiredHint': 'Paste cookies to enable saved-list import.',
     'googleImport.fetching': 'Fetching lists...',
     'googleImport.fetch': 'Fetch my saved lists',
     'googleImport.selectTitle': 'Select lists to import',
@@ -328,10 +320,6 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'googleImport.description': '在下方貼上 Google Cookie。Cookie 幾小時後會過期，每次匯入前請重新取得。',
     'googleImport.cookieHint': '開啟 Google Maps，然後開啟 DevTools (F12) -> Application -> Cookies -> https://www.google.com。複製完整 Cookie header，或從 Google Maps network request 的 cURL 複製 -b 值，再將原始分號分隔字串貼在這裡。',
     'googleImport.cookieLabel': 'Cookie 字串（以分號分隔的 key=value 配對）',
-    'googleImport.cookieStepDevTools': '在瀏覽器開啟 Google Maps，然後開啟 DevTools -> Application -> Cookies -> https://www.google.com。',
-    'googleImport.cookieStepCopy': '在 Network 分頁將 Google Maps request 複製為 cURL，取出 -b cookie 值，或從 request headers 複製完整 Cookie header。',
-    'googleImport.cookieStepPaste': '將原始的分號分隔 key=value 字串貼到下方。不要編輯或移除 Cookie 名稱。',
-    'googleImport.cookieRequiredHint': '貼上 Cookie 後才能匯入儲存清單。',
     'googleImport.fetching': '正在取得清單...',
     'googleImport.fetch': '取得我的儲存清單',
     'googleImport.selectTitle': '選擇要匯入的清單',
