@@ -4,9 +4,9 @@
   let { onBack }: { onBack: () => void } = $props();
 
   const version = '0.1.0';
-  const repoUrl = 'https://github.com/splasky/Gmap-to-uMap';
-  const releasesUrl = 'https://github.com/splasky/Gmap-to-uMap/releases';
-  const issueUrl = 'https://github.com/splasky/Gmap-to-uMap/issues';
+  const repoUrl = 'https://github.com/splasky/Mapodus';
+  const releasesUrl = 'https://github.com/splasky/Mapodus/releases';
+  const issueUrl = 'https://github.com/splasky/Mapodus/issues';
   const creditsUrl = 'https://github.com/splasky';
 
   let latestVersion = $state('');
@@ -22,7 +22,7 @@
   async function checkForUpdates() {
     checkingUpdate = true;
     try {
-      const response = await fetch('https://api.github.com/repos/splasky/Gmap-to-uMap/releases/latest');
+      const response = await fetch('https://api.github.com/repos/splasky/Mapodus/releases/latest');
       if (response.ok) {
         const data = await response.json();
         latestVersion = data.tag_name || data.name;
