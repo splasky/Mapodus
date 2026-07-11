@@ -85,9 +85,11 @@
 
 <div class="card">
   <h2>{t('upload.title')}</h2>
-  <p>
-    {t('upload.descriptionBeforeLink')}<a href="https://takeout.google.com/" target="_blank" rel="noopener noreferrer" onclick={openTakeout}>{t('upload.takeoutLink')}</a>{t('upload.descriptionAfterLink')}
-  </p>
+  {#if !uploaded}
+    <p>
+      {t('upload.descriptionBeforeLink')}<a href="https://takeout.google.com/" target="_blank" rel="noopener noreferrer" onclick={openTakeout}>{t('upload.takeoutLink')}</a>{t('upload.descriptionAfterLink')}
+    </p>
+  {/if}
 
   {#if error}
     <div class="notice error">{error}</div>
@@ -148,7 +150,6 @@
     <button class="google-btn" onclick={onGoogleImport}>
       {t('upload.googleImport')}
     </button>
-    <p class="hint source-hint">{t('upload.sourceHint')}</p>
   {/if}
 </div>
 
@@ -206,11 +207,6 @@
     font-weight: 600;
     text-align: center;
   }
-  .hint {
-    font-size: 0.85rem;
-    color: #64748b;
-    margin: 0.5rem 0;
-  }
   .validation-ready {
     background: #ecfdf5;
     color: #065f46;
@@ -228,8 +224,5 @@
     margin-top: 0.75rem;
     font-weight: 600;
     font-size: 0.9rem;
-  }
-  .source-hint {
-    text-align: center;
   }
 </style>

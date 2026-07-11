@@ -80,17 +80,10 @@
     />
   </label>
 
-    <button class="primary" onclick={connect} disabled={connecting}>
-    {connecting ? t('connect.connecting') : t('connect.connect')}
-  </button>
-
-  <div class="nav-row single-action">
+  <div class="nav-row">
     <button class="nav-prev" onclick={onPrev}>{t('common.previous')}</button>
+    <button class="primary" onclick={connect} disabled={connecting}>
+      {connecting ? t('connect.connecting') : t('connect.connect')}
+    </button>
   </div>
 </div>
-
-<style>
-  .single-action {
-    justify-content: flex-start;
-  }
-</style>

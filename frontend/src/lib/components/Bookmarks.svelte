@@ -90,17 +90,19 @@
       {/each}
     </div>
 
-    <button class="primary" onclick={proceed} disabled={selected.size === 0 || transferring}>
-      {#if transferring}
-        <span class="spinner"></span> {t('bookmarks.transferring')}
-      {:else}
-        {t('bookmarks.transferAction', { count: selected.size })}
-      {/if}
-    </button>
   {/if}
 
   <div class="nav-row">
     <button class="nav-prev" onclick={onPrev}>{t('common.previous')}</button>
+    {#if !loading}
+      <button class="primary" onclick={proceed} disabled={selected.size === 0 || transferring}>
+        {#if transferring}
+          <span class="spinner"></span> {t('bookmarks.transferring')}
+        {:else}
+          {t('bookmarks.transferAction', { count: selected.size })}
+        {/if}
+      </button>
+    {/if}
   </div>
 </div>
 
