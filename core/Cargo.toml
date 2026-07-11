@@ -10,6 +10,6 @@ csv = "1"
 geojson = { version = "0.24", features = ["geo-types"] }
 reqwest = { version = "0.12", features = ["json", "multipart", "cookies"] }
 s2 = { version = "0.0.13", default-features = false }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "rt", "net", "time"] }
 anyhow = "1"
 uuid = { version = "1", features = ["v4"] }

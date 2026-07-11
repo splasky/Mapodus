@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 umap-core = { path = "../core" }
 axum = { version = "0.8", features = ["multipart"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util", "sync", "time"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors"] }
 tower-sessions = "0.15"
