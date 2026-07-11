@@ -30,6 +30,7 @@
   let devMode = $state(false);
   let clearUmapPassword = $state(false);
   let clearGoogleMapsApiKey = $state(false);
+  const MASKED_SECRET = '••••••••';
 
   async function load() {
     loading = true;
@@ -52,10 +53,14 @@
     desktopMode = settings.desktop_mode;
     umapPasswordSaved = settings.umap_password_saved;
     googleMapsApiKeySaved = settings.google_maps_api_key_saved;
-    umapPassword = '';
-    googleMapsApiKey = '';
+    umapPassword = settings.umap_password_saved ? MASKED_SECRET : '';
+    googleMapsApiKey = settings.google_maps_api_key_saved ? MASKED_SECRET : '';
     clearUmapPassword = false;
     clearGoogleMapsApiKey = false;
+  }
+
+  function secretPayload(value: string): string | null {
+    return value === MASKED_SECRET ? null : value || null;
   }
 
   async function save() {
@@ -68,9 +73,9 @@
         umap_account: umapAccount || null,
         locale,
         dev_mode: devMode,
-        umap_password: umapPassword || null,
+        umap_password: secretPayload(umapPassword),
         clear_umap_password: clearUmapPassword,
-        google_maps_api_key: googleMapsApiKey || null,
+        google_maps_api_key: secretPayload(googleMapsApiKey),
         clear_google_maps_api_key: clearGoogleMapsApiKey
       });
       applySettings(settings);

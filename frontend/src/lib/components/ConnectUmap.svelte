@@ -9,6 +9,7 @@
   let passwordSaved = $state(false);
   let connecting = $state(false);
   let error = $state('');
+  const MASKED_SECRET = '••••••••';
 
   $effect(() => {
     apiGet<{ umap_default_url: string; umap_account?: string; umap_password_saved: boolean }>('/settings')
@@ -18,6 +19,7 @@
         }
         username = status.umap_account ?? '';
         passwordSaved = status.umap_password_saved;
+        password = status.umap_password_saved ? MASKED_SECRET : '';
       })
       .catch(() => {
         apiGet<{ umap_url?: string }>('/umap/status')
@@ -42,7 +44,8 @@
     connecting = true;
     error = '';
     try {
-      await apiPost('/umap/connect', { umap_url: umapUrl, username, password });
+      const passwordPayload = password === MASKED_SECRET ? '' : password;
+      await apiPost('/umap/connect', { umap_url: umapUrl, username, password: passwordPayload });
       onConnect();
     } catch (e) {
       error = String(e);
