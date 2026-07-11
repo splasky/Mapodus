@@ -5,13 +5,14 @@
   import ConnectUmap from './lib/components/ConnectUmap.svelte';
   import Settings from './lib/components/Settings.svelte';
   import Transfer from './lib/components/Transfer.svelte';
+  import About from './lib/components/About.svelte';
   import { apiGet } from './lib/api';
   import { setLocale, t } from './lib/i18n';
 
   // The app is intentionally a small wizard. Each step writes the server-side
   // session state needed by the next step instead of keeping all data in Svelte.
-  let step = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer' | 'settings'>('upload');
-  let previousStep = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer'>('upload');
+  let step = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer' | 'settings' | 'about'>('upload');
+  let previousStep = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer' | 'settings'>('upload');
   let umapConnected = $state(false);
   let bookmarksUploaded = $state(false);
 
@@ -54,6 +55,16 @@
     step = previousStep;
   }
 
+  function openAbout() {
+    if (step !== 'about') {
+      previousStep = step;
+    }
+    step = 'about';
+  }
+  function closeAbout() {
+    step = previousStep;
+  }
+
   function goPrev() {
     switch (step) {
       case 'google-import': step = 'upload'; break;
@@ -81,6 +92,7 @@
 <div class="layout">
   <div class="hero">
     <button class="settings-button" onclick={openSettings} aria-label={t('settings.open')}>⚙️</button>
+    <button class="about-button" onclick={openAbout} aria-label={t('about.open')}>ℹ️</button>
     <h1>{t('app.title')}</h1>
     <p>{t('app.subtitle')}</p>
   </div>
@@ -104,6 +116,8 @@
 
   {#if step === 'settings'}
     <Settings onBack={closeSettings} />
+  {:else if step === 'about'}
+    <About onBack={closeAbout} />
   {:else if step === 'upload'}
     <Upload {onUpload} {onGoogleImport} />
   {:else if step === 'google-import'}
@@ -167,6 +181,33 @@
     cursor: pointer;
     font-size: 1.1rem;
     padding: 0.45rem 0.72rem;
+  }
+
+  .settings-button:hover {
+    border-color: rgba(217, 116, 43, 0.42);
+    color: #9f4e1a;
+  }
+
+  .about-button {
+    position: absolute;
+    top: 1rem;
+    right: 4rem;
+    z-index: 1;
+    width: auto;
+    min-height: 2.75rem;
+    border: 1px solid rgba(36, 79, 60, 0.16);
+    border-radius: 999px;
+    background: rgba(255, 252, 244, 0.86);
+    box-shadow: 0 10px 28px rgba(36, 79, 60, 0.12);
+    color: #244f3c;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.45rem 0.72rem;
+  }
+
+  .about-button:hover {
+    border-color: rgba(217, 116, 43, 0.42);
+    color: #9f4e1a;
   }
 
   .settings-button:hover {

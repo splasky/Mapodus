@@ -8,6 +8,17 @@ export type MessageKey =
   | 'common.back'
   | 'common.next'
   | 'common.previous'
+  | 'about.open'
+  | 'about.title'
+  | 'about.subtitle'
+  | 'about.versionLabel'
+  | 'about.creditsLabel'
+  | 'about.credits'
+  | 'about.legalLabel'
+  | 'about.legal'
+  | 'about.linksLabel'
+  | 'about.website'
+  | 'about.reportIssue'
   | 'settings.open'
   | 'settings.title'
   | 'settings.description'
@@ -115,6 +126,17 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'common.back': 'Back',
     'common.next': 'Next',
     'common.previous': 'Previous',
+    'about.open': 'About',
+    'about.title': 'About Mapodus',
+    'about.subtitle': 'Google Maps Saved Lists to uMap',
+    'about.versionLabel': 'Version',
+    'about.creditsLabel': 'Credits',
+    'about.credits': 'HY Chang (splasky)',
+    'about.legalLabel': 'License',
+    'about.legal': 'This software is free software. Feel free to use, modify, and distribute.',
+    'about.linksLabel': 'Links',
+    'about.website': 'Repository',
+    'about.reportIssue': 'Report an Issue',
     'settings.open': 'Open settings',
     'settings.title': 'Settings',
     'settings.description': 'Configure defaults used during migration. Passwords and API keys are never shown after saving.',
@@ -221,6 +243,17 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'common.back': '返回',
     'common.next': '下一步',
     'common.previous': '上一步',
+    'about.open': '關於',
+    'about.title': '關於 Mapodus',
+    'about.subtitle': 'Google Maps 儲存清單到 uMap',
+    'about.versionLabel': '版本',
+    'about.creditsLabel': '製作者',
+    'about.credits': 'HY Chang (splasky)',
+    'about.legalLabel': '授權',
+    'about.legal': '本軟體為自由軟體。你可以自由使用、修改和發佈。',
+    'about.linksLabel': '連結',
+    'about.website': '專案儲存庫',
+    'about.reportIssue': '回報問題',
     'settings.open': '開啟設定',
     'settings.title': '設定',
     'settings.description': '設定遷移時使用的預設值。密碼與 API key 儲存後不會再次顯示。',
