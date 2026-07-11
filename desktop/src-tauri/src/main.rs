@@ -2,7 +2,6 @@
 
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
@@ -24,33 +23,6 @@ impl Default for DesktopConfig {
     }
 }
 
-#[tauri::command]
-fn open_url(url: String) -> Result<(), String> {
-    let command = if cfg!(target_os = "linux") {
-        Command::new("xdg-open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| format!("Failed to open URL: {}", e))?;
-        Ok(())
-    } else if cfg!(target_os = "macos") {
-        Command::new("open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| format!("Failed to open URL: {}", e))?;
-        Ok(())
-    } else if cfg!(target_os = "windows") {
-        Command::new("cmd")
-            .args(&["/C", "start", &url])
-            .spawn()
-            .map_err(|e| format!("Failed to open URL: {}", e))?;
-        Ok(())
-    } else {
-        Err("Unsupported platform".to_string())
-    };
-
-    command
-}
-
 fn main() {
     dotenvy::dotenv().ok();
     // SAFETY: This runs during process startup before the embedded backend is
@@ -63,7 +35,6 @@ fn main() {
     }
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![open_url])
         .setup(|app| {
             let (addr, _backend) = tauri::async_runtime::block_on(web::serve_on_available_port())?;
             let url = url::Url::parse(&format!("http://{addr}/"))?;
