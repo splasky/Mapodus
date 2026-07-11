@@ -73,12 +73,6 @@
     <h2>{t('googleImport.title')}</h2>
     <p>{t('googleImport.description')}</p>
     <p class="hint">{t('googleImport.cookieHint')}</p>
-    <ol class="cookie-steps">
-      <li>{t('googleImport.cookieStepDevTools')}</li>
-      <li>{t('googleImport.cookieStepCopy')}</li>
-      <li>{t('googleImport.cookieStepPaste')}</li>
-    </ol>
-
     {#if error}
       <div class="notice error">{error}</div>
     {/if}
@@ -91,9 +85,6 @@
     <button onclick={handleImport} disabled={importing || !cookieString.trim()}>
       {importing ? t('googleImport.fetching') : t('googleImport.fetch')}
     </button>
-    {#if !cookieString.trim()}
-      <p class="hint action-hint">{t('googleImport.cookieRequiredHint')}</p>
-    {/if}
   {:else}
     <h2>{t('googleImport.selectTitle')}</h2>
     <p>{t('googleImport.selectDescription')}</p>
@@ -167,16 +158,6 @@
     font-family: monospace;
     font-size: 0.8rem;
     box-sizing: border-box;
-  }
-  .cookie-steps {
-    margin: 0 0 1rem 1.2rem;
-    padding: 0;
-    color: #475569;
-    font-size: 0.86rem;
-    line-height: 1.5;
-  }
-  .cookie-steps li {
-    margin-bottom: 0.35rem;
   }
   .list-toolbar {
     display: flex;

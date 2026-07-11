@@ -72,8 +72,10 @@
 
 <div class="layout">
   <div class="hero">
-    <button class="settings-button" onclick={openSettings} aria-label={t('settings.open')}>⚙️</button>
-    <button class="about-button" onclick={openAbout} aria-label={t('about.open')}>ℹ️</button>
+    <div class="hero-actions" aria-label="Mapodus actions">
+      <button class="hero-action" onclick={openAbout} aria-label={t('about.open')}>ℹ️</button>
+      <button class="hero-action" onclick={openSettings} aria-label={t('settings.open')}>⚙️</button>
+    </div>
     <h1>{t('app.title')}</h1>
     <p>{t('app.subtitle')}</p>
   </div>
@@ -149,52 +151,36 @@
     transform: rotate(-16deg);
   }
 
-  .settings-button {
+  .hero-actions {
     position: absolute;
     top: 0.65rem;
     right: 0.65rem;
     z-index: 1;
-    width: auto;
-    min-height: 2.75rem;
-    border: 1px solid rgba(36, 79, 60, 0.16);
+    display: flex;
+    gap: 0.35rem;
+    padding: 0.25rem;
+    border: 1px solid rgba(36, 79, 60, 0.14);
     border-radius: 999px;
-    background: rgba(255, 252, 244, 0.86);
+    background: rgba(255, 252, 244, 0.72);
     box-shadow: 0 10px 28px rgba(36, 79, 60, 0.12);
+  }
+
+  .hero-action {
+    width: 2.35rem;
+    min-height: 2.35rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
     color: #244f3c;
     cursor: pointer;
-    font-size: 1.1rem;
-    padding: 0.45rem 0.72rem;
+    font-size: 1.05rem;
   }
 
-  .settings-button:hover {
-    border-color: rgba(217, 116, 43, 0.42);
-    color: #9f4e1a;
-  }
-
-  .about-button {
-    position: absolute;
-    top: 1rem;
-    right: 4rem;
-    z-index: 1;
-    width: auto;
-    min-height: 2.75rem;
-    border: 1px solid rgba(36, 79, 60, 0.16);
-    border-radius: 999px;
-    background: rgba(255, 252, 244, 0.86);
-    box-shadow: 0 10px 28px rgba(36, 79, 60, 0.12);
-    color: #244f3c;
-    cursor: pointer;
-    font-size: 1.1rem;
-    padding: 0.45rem 0.72rem;
-  }
-
-  .about-button:hover {
-    border-color: rgba(217, 116, 43, 0.42);
-    color: #9f4e1a;
-  }
-
-  .settings-button:hover {
-    border-color: rgba(217, 116, 43, 0.42);
+  .hero-action:hover {
+    border-color: rgba(217, 116, 43, 0.34);
+    background: #fffaf0;
     color: #9f4e1a;
   }
 
