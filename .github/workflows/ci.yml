@@ -82,11 +82,16 @@ jobs:
               run: npm run build
 
     desktop:
-        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                platform: [ubuntu-latest, windows-latest]
+        runs-on: ${{ matrix.platform }}
         steps:
             - uses: actions/checkout@v6
 
             - name: Install Tauri Linux dependencies
+              if: matrix.platform == 'ubuntu-latest'
               run: |
                   sudo apt-get update
                   sudo apt-get install -y \
