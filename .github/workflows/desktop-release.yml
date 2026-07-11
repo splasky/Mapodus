@@ -83,6 +83,12 @@ jobs:
                   prerelease: false
                   args: ${{ matrix.args }}
 
+            - name: Report binary size
+              run: |
+                  echo "=== Binary size report ==="
+                  ls -lh target/release/mapodus-desktop
+                  file target/release/mapodus-desktop
+
             - name: Package Linux binary archive
               if: matrix.platform == 'ubuntu-latest'
               run: |
