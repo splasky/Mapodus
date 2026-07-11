@@ -9,13 +9,17 @@ export type MessageKey =
   | 'common.next'
   | 'common.previous'
   | 'about.open'
+  | 'about.close'
   | 'about.title'
   | 'about.subtitle'
   | 'about.versionLabel'
-  | 'about.checkUpdate'
   | 'about.checking'
   | 'about.updateAvailable'
-  | 'about.whatsNewLabel'
+  | 'about.updateUnavailable'
+  | 'about.updateUnknown'
+  | 'about.latestReleaseLabel'
+  | 'about.releaseNotesLabel'
+  | 'about.releaseNotes'
   | 'about.viewReleases'
   | 'about.creditsLabel'
   | 'about.credits'
@@ -132,14 +136,18 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'common.next': 'Next',
     'common.previous': 'Previous',
     'about.open': 'About',
+    'about.close': 'Close about',
     'about.title': 'About Mapodus',
     'about.subtitle': 'Google Maps Saved Lists to uMap',
     'about.versionLabel': 'Version',
-    'about.checkUpdate': 'Check for updates',
     'about.checking': 'Checking...',
-    'about.updateAvailable': 'Update available:',
-    'about.whatsNewLabel': "What's New",
-    'about.viewReleases': 'View releases on GitHub',
+    'about.updateAvailable': 'Update available',
+    'about.updateUnavailable': 'Could not check releases',
+    'about.updateUnknown': 'Not checked yet',
+    'about.latestReleaseLabel': 'Latest release',
+    'about.releaseNotesLabel': 'Release notes',
+    'about.releaseNotes': 'Feature descriptions are listed on the GitHub releases page.',
+    'about.viewReleases': 'View releases',
     'about.creditsLabel': 'Credits',
     'about.credits': 'HY Chang (splasky)',
     'about.legalLabel': 'License',
@@ -254,14 +262,18 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     'common.next': '下一步',
     'common.previous': '上一步',
     'about.open': '關於',
+    'about.close': '關閉關於視窗',
     'about.title': '關於 Mapodus',
     'about.subtitle': 'Google Maps 儲存清單到 uMap',
     'about.versionLabel': '版本',
-    'about.checkUpdate': '檢查更新',
     'about.checking': '檢查中...',
-    'about.updateAvailable': '有更新版本：',
-    'about.whatsNewLabel': '最新消息',
-    'about.viewReleases': '在 GitHub 查看發佈版本',
+    'about.updateAvailable': '有更新版本',
+    'about.updateUnavailable': '無法檢查發佈版本',
+    'about.updateUnknown': '尚未檢查',
+    'about.latestReleaseLabel': '最新版本',
+    'about.releaseNotesLabel': '發佈說明',
+    'about.releaseNotes': '功能描述列在 GitHub releases 頁面。',
+    'about.viewReleases': '查看發佈版本',
     'about.creditsLabel': '製作者',
     'about.credits': 'HY Chang (splasky)',
     'about.legalLabel': '授權',

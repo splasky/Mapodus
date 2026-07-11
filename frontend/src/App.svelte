@@ -11,8 +11,9 @@
 
   // The app is intentionally a small wizard. Each step writes the server-side
   // session state needed by the next step instead of keeping all data in Svelte.
-  let step = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer' | 'settings' | 'about'>('upload');
-  let previousStep = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer' | 'settings'>('upload');
+  let step = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer' | 'settings'>('upload');
+  let previousStep = $state<'upload' | 'google-import' | 'bookmarks' | 'connect' | 'transfer'>('upload');
+  let aboutOpen = $state(false);
   let umapConnected = $state(false);
   let bookmarksUploaded = $state(false);
 
@@ -56,13 +57,7 @@
   }
 
   function openAbout() {
-    if (step !== 'about') {
-      previousStep = step;
-    }
-    step = 'about';
-  }
-  function closeAbout() {
-    step = previousStep;
+    aboutOpen = true;
   }
 
   function goPrev() {
@@ -116,8 +111,6 @@
 
   {#if step === 'settings'}
     <Settings onBack={closeSettings} />
-  {:else if step === 'about'}
-    <About onBack={closeAbout} />
   {:else if step === 'upload'}
     <Upload {onUpload} {onGoogleImport} />
   {:else if step === 'google-import'}
@@ -128,6 +121,10 @@
     <ConnectUmap onConnect={onConnect} onPrev={goPrev} onNext={goNext} />
   {:else if step === 'transfer'}
     <Transfer onDone={onDone} onPrev={goPrev} />
+  {/if}
+
+  {#if aboutOpen}
+    <About onClose={() => aboutOpen = false} />
   {/if}
 </div>
 

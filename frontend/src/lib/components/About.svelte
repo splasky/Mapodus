@@ -1,8 +1,7 @@
 <script lang="ts">
   import { t } from '../i18n';
-  import { openUrl } from '../utils';
 
-  let { onBack }: { onBack: () => void } = $props();
+  let { onClose }: { onClose: () => void } = $props();
 
   const version = '0.1.0';
   const repoUrl = 'https://github.com/splasky/Mapodus';
@@ -11,252 +10,233 @@
   const creditsUrl = 'https://github.com/splasky';
 
   let latestVersion = $state('');
+  let releaseNote = $state('');
   let checkingUpdate = $state(false);
-  let updateAvailable = $state(false);
-  let releases: Array<{ name: string; body: string }> = $state([]);
+  let updateError = $state(false);
 
-  // Fetch latest release info on component mount
+  // About opens as a popup, so check GitHub releases when the popup is shown.
   $effect(() => {
     checkForUpdates();
   });
 
   async function checkForUpdates() {
     checkingUpdate = true;
+    updateError = false;
     try {
       const response = await fetch('https://api.github.com/repos/splasky/Mapodus/releases/latest');
-      if (response.ok) {
-        const data = await response.json();
-        latestVersion = data.tag_name || data.name;
-        updateAvailable = latestVersion && latestVersion !== `v${version}`;
+      if (!response.ok) {
+        updateError = true;
+        return;
       }
-    } catch (e) {
-      // Silently fail if release check fails
-      console.debug('Failed to check for updates:', e);
+      const data = await response.json();
+      latestVersion = data.tag_name || data.name || '';
+      releaseNote = data.name || data.tag_name || '';
+    } catch {
+      updateError = true;
     } finally {
       checkingUpdate = false;
     }
   }
 
-  async function openReleases() {
-    await openUrl(releasesUrl);
+  function normalizeVersion(value: string) {
+    return value.trim().replace(/^v/i, '');
   }
 
-  async function openRepo() {
-    await openUrl(repoUrl);
+  function closeFromBackdrop(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
   }
 
-  async function openIssues() {
-    await openUrl(issueUrl);
-  }
-
-  async function openCredits() {
-    await openUrl(creditsUrl);
+  function closeOnEscape(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      onClose();
+    }
   }
 </script>
 
-<div class="card">
-  <h2>{t('about.title')}</h2>
-  <p class="subtitle">{t('about.subtitle')}</p>
+<div class="about-backdrop" role="presentation" onclick={closeFromBackdrop}>
+  <div class="about-dialog card" role="dialog" aria-modal="true" aria-labelledby="about-title" tabindex="-1" onkeydown={closeOnEscape}>
+    <button class="close-button" onclick={onClose} aria-label={t('about.close')}>x</button>
 
-  <div class="about-content">
-    <div class="section">
-      <h3>{t('about.versionLabel')}</h3>
-      <div class="version-info">
-        <p>{version}</p>
-        <button 
-          class="check-update-btn" 
-          onclick={checkForUpdates}
-          disabled={checkingUpdate}
-          aria-label={t('about.checkUpdate')}
-        >
-          {checkingUpdate ? t('about.checking') : t('about.checkUpdate')}
-        </button>
-      </div>
-      {#if updateAvailable}
-        <p class="update-available">{t('about.updateAvailable')} {latestVersion}</p>
-      {/if}
-    </div>
-
-    <div class="section">
-      <h3>{t('about.whatsNewLabel')}</h3>
-      <button class="view-releases-btn" onclick={openReleases}>
-        {t('about.viewReleases')}
-      </button>
-    </div>
-
-    <div class="section">
-      <h3>{t('about.creditsLabel')}</h3>
-      <button class="link-text" onclick={openCredits}>
-        {t('about.credits')}
-      </button>
-    </div>
-
-    <div class="section">
-      <h3>{t('about.legalLabel')}</h3>
-      <p>{t('about.legal')}</p>
-    </div>
-
-    <div class="section links">
-      <h3>{t('about.linksLabel')}</h3>
-      <div class="link-buttons">
-        <button class="link-button" onclick={openRepo}>
-          {t('about.website')}
-        </button>
-        <button class="link-button" onclick={openIssues}>
-          {t('about.reportIssue')}
-        </button>
+    <div class="about-heading">
+      <div class="app-icon" aria-hidden="true">M</div>
+      <div>
+        <h2 id="about-title">{t('about.title')}</h2>
+        <p>{t('about.subtitle')}</p>
       </div>
     </div>
-  </div>
 
-  <div class="nav-row">
-    <button class="nav-prev" onclick={onBack}>{t('common.back')}</button>
+    <dl class="about-list">
+      <div>
+        <dt>{t('about.versionLabel')}</dt>
+        <dd>{version}</dd>
+      </div>
+      <div>
+        <dt>{t('about.latestReleaseLabel')}</dt>
+        <dd>
+          {#if checkingUpdate}
+            {t('about.checking')}
+          {:else if latestVersion}
+            {latestVersion}
+            {#if normalizeVersion(latestVersion) !== version}
+              <span class="update-note">{t('about.updateAvailable')}</span>
+            {/if}
+          {:else if updateError}
+            {t('about.updateUnavailable')}
+          {:else}
+            {t('about.updateUnknown')}
+          {/if}
+        </dd>
+      </div>
+      <div>
+        <dt>{t('about.releaseNotesLabel')}</dt>
+        <dd>
+          {#if releaseNote}
+            {releaseNote}
+          {:else}
+            {t('about.releaseNotes')}
+          {/if}
+          <a href={releasesUrl} target="_blank" rel="noreferrer">{t('about.viewReleases')}</a>
+        </dd>
+      </div>
+      <div>
+        <dt>{t('about.creditsLabel')}</dt>
+        <dd><a href={creditsUrl} target="_blank" rel="noreferrer">{t('about.credits')}</a></dd>
+      </div>
+      <div>
+        <dt>{t('about.legalLabel')}</dt>
+        <dd>{t('about.legal')}</dd>
+      </div>
+      <div>
+        <dt>{t('about.linksLabel')}</dt>
+        <dd class="links">
+          <a href={repoUrl} target="_blank" rel="noreferrer">{t('about.website')}</a>
+          <a href={issueUrl} target="_blank" rel="noreferrer">{t('about.reportIssue')}</a>
+        </dd>
+      </div>
+    </dl>
   </div>
 </div>
 
 <style>
-  .subtitle {
-    color: #6b746d;
-    font-size: 0.95rem;
-    margin-top: 0.25rem;
-  }
-
-  .about-content {
-    margin: 1.5rem 0;
-  }
-
-  .section {
-    margin-bottom: 1.5rem;
-  }
-
-  .section h3 {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: #244f3c;
-    margin-bottom: 0.4rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .section p {
-    color: #475569;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    margin: 0;
-  }
-
-  .section a {
-    color: #d9742b;
-    text-decoration: none;
-    font-weight: 600;
-    transition: color 0.2s;
-  }
-
-  .section a:hover {
-    color: #9f4e1a;
-    text-decoration: underline;
-  }
-
-  .link-text {
-    background: none;
-    border: none;
-    color: #d9742b;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0;
-    transition: color 0.2s;
-    text-decoration: none;
-    font-family: inherit;
-  }
-
-  .link-text:hover {
-    color: #9f4e1a;
-    text-decoration: underline;
-  }
-
-  .version-info {
+  .about-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(24, 37, 31, 0.34);
+    backdrop-filter: blur(8px);
   }
 
-  .version-info p {
+  .about-dialog {
+    width: min(28rem, 100%);
+    gap: 1.1rem;
     margin: 0;
   }
 
-  .check-update-btn {
-    padding: 0.35rem 0.75rem;
-    border: 1px solid rgba(217, 116, 43, 0.3);
-    border-radius: 0.4rem;
-    background: rgba(217, 116, 43, 0.08);
-    color: #d9742b;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
+  .close-button {
+    position: absolute;
+    top: 0.85rem;
+    right: 0.85rem;
+    min-height: 2rem;
+    padding: 0.2rem 0.72rem;
+    font-size: 1.25rem;
+    line-height: 1;
   }
 
-  .check-update-btn:hover:not(:disabled) {
-    border-color: rgba(217, 116, 43, 0.5);
-    background: rgba(217, 116, 43, 0.12);
-    color: #9f4e1a;
-  }
-
-  .check-update-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .update-available {
-    margin-top: 0.5rem;
-    color: #d9742b;
-    font-size: 0.85rem;
-    font-weight: 600;
-  }
-
-  .view-releases-btn {
-    padding: 0.5rem 1rem;
-    border: 1px solid rgba(217, 116, 43, 0.3);
-    border-radius: 0.5rem;
-    background: rgba(217, 116, 43, 0.08);
-    color: #d9742b;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .view-releases-btn:hover {
-    border-color: rgba(217, 116, 43, 0.5);
-    background: rgba(217, 116, 43, 0.12);
-    color: #9f4e1a;
-  }
-
-  .links .link-buttons {
+  .about-heading {
     display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem;
+    padding-right: 2.5rem;
   }
 
-  .link-button {
-    padding: 0.5rem 1rem;
-    border: 1px solid rgba(217, 116, 43, 0.3);
-    border-radius: 0.5rem;
-    background: rgba(217, 116, 43, 0.08);
-    color: #d9742b;
+  .about-heading p {
+    margin: 0.25rem 0 0;
+  }
+
+  .app-icon {
+    display: grid;
+    width: 3.6rem;
+    height: 3.6rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #244f3c, #d9742b);
+    color: #fffaf0;
+    font-size: 1.7rem;
+    font-weight: 800;
+  }
+
+  .about-list {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid rgba(36, 79, 60, 0.12);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.42);
+  }
+
+  .about-list div {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    gap: 1rem;
+    padding: 0.78rem 0.9rem;
+    border-bottom: 1px solid rgba(36, 79, 60, 0.1);
+  }
+
+  .about-list div:last-child {
+    border-bottom: 0;
+  }
+
+  dt {
+    color: #244f3c;
     font-size: 0.85rem;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.2s;
-    cursor: pointer;
-    font-family: inherit;
+    font-weight: 800;
   }
 
-  .link-button:hover {
-    border-color: rgba(217, 116, 43, 0.5);
-    background: rgba(217, 116, 43, 0.12);
+  dd {
+    margin: 0;
+    color: #526056;
+    font-size: 0.9rem;
+  }
+
+  dd a {
+    display: inline-block;
+    margin-left: 0.45rem;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .links a:first-child {
+    margin-left: 0;
+  }
+
+  .update-note {
+    display: inline-block;
+    margin-left: 0.45rem;
     color: #9f4e1a;
+    font-weight: 800;
+  }
+
+  @media (max-width: 560px) {
+    .about-list div {
+      grid-template-columns: 1fr;
+      gap: 0.2rem;
+    }
+
+    dd a {
+      margin-right: 0.45rem;
+      margin-left: 0;
+    }
   }
 </style>
