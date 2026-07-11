@@ -113,7 +113,7 @@ button:not(.primary):not(.google-btn):not(.settings-button):not(.hero-action):no
 
 .hero p {
   max-width: 36rem;
-  margin: 5px 0 0;
+  margin: 20px 0 0;
   color: #526056;
   font-size: clamp(0.95rem, 1.6vw, 1.1rem);
 }
