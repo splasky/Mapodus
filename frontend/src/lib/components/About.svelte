@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n';
+  import { openUrl } from '../utils';
 
   let { onBack }: { onBack: () => void } = $props();
 
@@ -36,8 +37,20 @@
     }
   }
 
-  function openReleases() {
-    window.open(releasesUrl, '_blank');
+  async function openReleases() {
+    await openUrl(releasesUrl);
+  }
+
+  async function openRepo() {
+    await openUrl(repoUrl);
+  }
+
+  async function openIssues() {
+    await openUrl(issueUrl);
+  }
+
+  async function openCredits() {
+    await openUrl(creditsUrl);
   }
 </script>
 
@@ -73,11 +86,9 @@
 
     <div class="section">
       <h3>{t('about.creditsLabel')}</h3>
-      <p>
-        <a href={creditsUrl} target="_blank" rel="noopener noreferrer">
-          {t('about.credits')}
-        </a>
-      </p>
+      <button class="link-text" onclick={openCredits}>
+        {t('about.credits')}
+      </button>
     </div>
 
     <div class="section">
@@ -88,12 +99,12 @@
     <div class="section links">
       <h3>{t('about.linksLabel')}</h3>
       <div class="link-buttons">
-        <a href={repoUrl} target="_blank" rel="noopener noreferrer" class="link-button">
+        <button class="link-button" onclick={openRepo}>
           {t('about.website')}
-        </a>
-        <a href={issueUrl} target="_blank" rel="noopener noreferrer" class="link-button">
+        </button>
+        <button class="link-button" onclick={openIssues}>
           {t('about.reportIssue')}
-        </a>
+        </button>
       </div>
     </div>
   </div>
@@ -142,6 +153,24 @@
   }
 
   .section a:hover {
+    color: #9f4e1a;
+    text-decoration: underline;
+  }
+
+  .link-text {
+    background: none;
+    border: none;
+    color: #d9742b;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.2s;
+    text-decoration: none;
+    font-family: inherit;
+  }
+
+  .link-text:hover {
     color: #9f4e1a;
     text-decoration: underline;
   }
@@ -212,7 +241,6 @@
   }
 
   .link-button {
-    display: inline-block;
     padding: 0.5rem 1rem;
     border: 1px solid rgba(217, 116, 43, 0.3);
     border-radius: 0.5rem;
@@ -222,6 +250,8 @@
     font-weight: 600;
     text-decoration: none;
     transition: all 0.2s;
+    cursor: pointer;
+    font-family: inherit;
   }
 
   .link-button:hover {
