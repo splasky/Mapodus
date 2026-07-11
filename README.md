@@ -25,6 +25,8 @@ inside the Tauri process, so you do not need to run a separate server.
 - Rust nightly toolchain
 - Node.js 22+ and npm
 - Tauri system dependencies for your OS
+- Release the binary in Linux/Windows/MacOS
+  - But the author only have linux. So he only test on ubuntu 24.04. If you find any bugs. Please report.
 
 ### Run Locally
 
@@ -59,23 +61,6 @@ Secrets such as Google cookies, uMap passwords, OAuth tokens, and session
 cookies must not be stored in this config file. In desktop mode, saved secrets
 use the OS credential vault/keychain.
 
-### Desktop Releases
-
-Pushing a version tag creates a GitHub Release:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-The release workflow builds and uploads:
-
-- macOS `.dmg`
-- Windows `.msi`
-- Linux `.AppImage`
-- Linux binary archive `.tar.gz`
-- GitHub source code `.zip`
-- GitHub source code `.tar.gz`
 
 ## CLI
 
@@ -206,6 +191,24 @@ The web server also accepts optional CLI flags:
 | Flag | Description |
 |------|-------------|
 | `--google-cookies <COOKIES>` | Google Maps cookies for dev mode; imports and prints saved lists on startup |
+
+### Desktop Releases
+
+Pushing a version tag creates a GitHub Release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow builds and uploads:
+
+- macOS `.dmg`
+- Windows `.msi`
+- Linux `.AppImage`
+- Linux binary archive `.tar.gz`
+- GitHub source code `.zip`
+- GitHub source code `.tar.gz`
 
 ## Testing
 
