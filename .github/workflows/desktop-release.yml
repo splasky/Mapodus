@@ -12,21 +12,73 @@ env:
     CARGO_TERM_COLOR: always
 
 jobs:
+    create-release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Create release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  name: Mapodus ${{ github.ref_name }}
+                  body: |
+                      Desktop release for Mapodus.
+
+                      Artifacts:
+                      - Windows x64 portable: exe
+                      - Linux x86_64 portable: AppImage
+                      - macOS Intel: dmg
+                      - macOS Apple Silicon: dmg
+                  draft: false
+                  prerelease: false
+
     publish-desktop:
+        needs: create-release
         strategy:
             fail-fast: false
             matrix:
                 include:
-                    - platform: macos-latest
-                      args: --bundles dmg
                     - platform: windows-latest
-                      args: --bundles msi
+                      os_name: windows
+                      arch: x64
+                      kind: portable-exe
+                      artifact_ext: exe
                     - platform: ubuntu-latest
-                      args: --bundles appimage
+                      os_name: linux
+                      arch: x86_64
+                      kind: appimage
+                      bundle: appimage
+                      artifact_ext: AppImage
+                    - platform: macos-13
+                      os_name: macos
+                      arch: x86_64
+                      kind: dmg
+                      target: x86_64-apple-darwin
+                      bundle: dmg
+                      artifact_ext: dmg
+                    - platform: macos-14
+                      os_name: macos
+                      arch: aarch64
+                      kind: dmg
+                      target: aarch64-apple-darwin
+                      bundle: dmg
+                      artifact_ext: dmg
         runs-on: ${{ matrix.platform }}
 
         steps:
             - uses: actions/checkout@v6
+
+            - name: Prepare release variables
+              id: release
+              shell: bash
+              run: |
+                  version="${GITHUB_REF_NAME#v}"
+                  if [[ "${{ matrix.kind }}" == "portable-exe" ]]; then
+                    artifact="Mapodus_${version}_${{ matrix.os_name }}_${{ matrix.arch }}_portable.${{ matrix.artifact_ext }}"
+                  else
+                    artifact="Mapodus_${version}_${{ matrix.os_name }}_${{ matrix.arch }}.${{ matrix.artifact_ext }}"
+                  fi
+                  echo "version=${version}" >> "$GITHUB_OUTPUT"
+                  echo "artifact=${artifact}" >> "$GITHUB_OUTPUT"
 
             - name: Install Tauri Linux dependencies
               if: matrix.platform == 'ubuntu-latest'
@@ -43,6 +95,10 @@ jobs:
             - name: Install nightly toolchain
               run: rustup toolchain install nightly
 
+            - name: Add Rust target
+              if: matrix.kind == 'dmg'
+              run: rustup target add ${{ matrix.target }}
+
             - name: Setup Node.js
               uses: actions/setup-node@v6
               with:
@@ -54,6 +110,10 @@ jobs:
               working-directory: frontend
               run: npm ci
 
+            - name: Install Tauri CLI
+              if: matrix.kind != 'portable-exe'
+              run: npm install -g @tauri-apps/cli@v2
+
             - name: Cache cargo
               uses: actions/cache@v6
               with:
@@ -61,46 +121,52 @@ jobs:
                       ~/.cargo/registry
                       ~/.cargo/git
                       target
-                  key: ${{ runner.os }}-desktop-release-cargo-${{ hashFiles('Cargo.lock') }}
+                  key: ${{ runner.os }}-${{ matrix.arch }}-desktop-release-cargo-${{ hashFiles('Cargo.lock') }}
 
-            - name: Build and upload Tauri bundles
-              uses: tauri-apps/tauri-action@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  projectPath: desktop/src-tauri
-                  tagName: ${{ github.ref_name }}
-                  releaseName: Mapodus ${{ github.ref_name }}
-                  releaseBody: |
-                      Desktop release for Mapodus.
+            - name: Build Windows portable executable
+              if: matrix.kind == 'portable-exe'
+              run: cargo build --release -p mapodus-desktop
 
-                      Artifacts:
-                      - macOS: dmg
-                      - Windows: msi
-                      - Linux: AppImage and binary tar.gz
-                      - Source code archives are provided by GitHub.
-                  releaseDraft: false
-                  prerelease: false
-                  args: ${{ matrix.args }}
-
-            - name: Report binary size
+            - name: Build Tauri bundle
+              if: matrix.kind != 'portable-exe'
+              working-directory: desktop
+              shell: bash
               run: |
-                  echo "=== Binary size report ==="
-                  ls -lh target/release/mapodus-desktop
-                  file target/release/mapodus-desktop
+                  args=(build --bundles "${{ matrix.bundle }}")
+                  if [[ -n "${{ matrix.target }}" ]]; then
+                    args+=(--target "${{ matrix.target }}")
+                  fi
+                  tauri "${args[@]}"
 
-            - name: Package Linux binary archive
-              if: matrix.platform == 'ubuntu-latest'
+            - name: Collect release asset
+              shell: bash
               run: |
-                  mkdir -p dist/mapodus-linux-x86_64
-                  cp target/release/mapodus-desktop dist/mapodus-linux-x86_64/
-                  cp README.md dist/mapodus-linux-x86_64/
-                  cp desktop/README.md dist/mapodus-linux-x86_64/DESKTOP.md
-                  tar -C dist -czf mapodus-linux-x86_64.tar.gz mapodus-linux-x86_64
+                  mkdir -p dist
+                  case "${{ matrix.kind }}" in
+                    portable-exe)
+                      cp target/release/mapodus-desktop.exe "dist/${{ steps.release.outputs.artifact }}"
+                      ;;
+                    appimage)
+                      asset="$(find target -path '*/bundle/appimage/*.AppImage' -print -quit)"
+                      if [[ -z "${asset}" ]]; then
+                        echo "AppImage asset not found" >&2
+                        exit 1
+                      fi
+                      cp "${asset}" "dist/${{ steps.release.outputs.artifact }}"
+                      ;;
+                    dmg)
+                      asset="$(find target -path '*/bundle/dmg/*.dmg' -print -quit)"
+                      if [[ -z "${asset}" ]]; then
+                        echo "DMG asset not found" >&2
+                        exit 1
+                      fi
+                      cp "${asset}" "dist/${{ steps.release.outputs.artifact }}"
+                      ;;
+                  esac
+                  ls -lh "dist/${{ steps.release.outputs.artifact }}"
 
-            - name: Upload Linux binary archive
-              if: matrix.platform == 'ubuntu-latest'
+            - name: Upload release asset
               uses: softprops/action-gh-release@v2
               with:
                   tag_name: ${{ github.ref_name }}
-                  files: mapodus-linux-x86_64.tar.gz
+                  files: dist/${{ steps.release.outputs.artifact }}
