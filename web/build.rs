@@ -20,7 +20,9 @@ fn main() {
     println!("cargo:rerun-if-changed=../frontend/vite.config.ts");
     println!("cargo:rerun-if-changed=../frontend/svelte.config.js");
 
-    let status = Command::new("npm")
+    let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
+
+    let status = Command::new(npm)
         .args(["run", "build"])
         .current_dir("../frontend")
         .status()
