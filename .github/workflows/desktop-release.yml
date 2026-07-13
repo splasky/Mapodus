@@ -16,7 +16,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Create release
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3.0.1
               with:
                   tag_name: ${{ github.ref_name }}
                   name: Mapodus ${{ github.ref_name }}
@@ -166,7 +166,7 @@ jobs:
                   ls -lh "dist/${{ steps.release.outputs.artifact }}"
 
             - name: Upload release asset
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3.0.1
               with:
                   tag_name: ${{ github.ref_name }}
                   files: dist/${{ steps.release.outputs.artifact }}
