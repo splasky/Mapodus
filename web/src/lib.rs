@@ -19,6 +19,7 @@ pub mod settings;
 use std::net::SocketAddr;
 
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::get;
@@ -43,6 +44,8 @@ pub fn build_app() -> Router {
         .merge(api::routes())
         .layer(session_layer)
         .layer(CorsLayer::permissive())
+        // Google Takeout CSV exports can exceed Axum's 2 MiB default body limit.
+        .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
 }
 
 pub async fn serve_listener(listener: TcpListener) -> std::io::Result<()> {
